@@ -36,7 +36,8 @@ class EmployeesExport implements FromQuery, WithHeadings, WithMapping
             'ESI Number',
             'PF Number',
             'Department',
-            'Designation'
+            'Designation',
+            'Location'
         ];
     }
 
@@ -56,7 +57,8 @@ class EmployeesExport implements FromQuery, WithHeadings, WithMapping
             $employee->employee_esi_no,
             $employee->employee_pf_no,
             $employee->department ? $employee->department->department_name : 'N/A',
-            $employee->designation ? $employee->designation->designation_name : 'N/A'
+            $employee->designation ? $employee->designation->designation_name : 'N/A',
+            $employee->location ? $employee->location->name : 'N/A'
         ];
     }
 } 

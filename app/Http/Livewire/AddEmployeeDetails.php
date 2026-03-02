@@ -12,10 +12,11 @@ use Illuminate\Http\Request;
 use App\Models\Employee;
 use App\Models\Company;
 use App\Models\Department;
+use App\Models\Location;
 use Illuminate\Support\Facades\Log;
 use App\Exports\EmployeesExport;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Imports\EmployeesImport;
+use App\Imports\EmployeeImport;
 
 class AddEmployeeDetails extends Component
 {
@@ -48,6 +49,8 @@ class AddEmployeeDetails extends Component
     #[Validate('required')]
     public string $designation = '';
     
+    public string $location = '';
+    
     public string $companyName = '';
     public string $employeeCompanyCode = '';
     public string $joiningDate = '';
@@ -61,6 +64,7 @@ class AddEmployeeDetails extends Component
     public $selectedDepartment = '';
     public $excelFile;
     public $importDepartment = '';
+    public $importLocation = '';
     public $isImporting = false;
     public $importMessage = '';
     public $importError = '';
@@ -72,10 +76,14 @@ class AddEmployeeDetails extends Component
 
     public function render()
     {
-        $company = Company::with('departments')->find(request()->session()->get('companyIdNum'));
-        $departments = $company->departments;
+        $company = Company::with(['departments', 'locations'])->find(request()->session()->get('companyId'));
+        $departments = $company ? $company->departments : collect();
+        $locations = $company ? $company->locations : collect();
 
-        return view('livewire.add-employee-details', ["departments" => $departments]);
+        return view('livewire.add-employee-details', [
+            "departments" => $departments,
+            "locations" => $locations
+        ]);
     }
 
     public function save()
@@ -85,21 +93,21 @@ class AddEmployeeDetails extends Component
 
         try {
             $employee = Employee::create([
-                'company_id' => request()->session()->get("companyIdNum"),
-                'employee_first_name' => $this->firstName,
-                'employee_middle_name' => $this->middleName,
-                'employee_last_name' => $this->lastName,
-                'employee_father_name' => $this->fatherName,
-                'employee_gender' => $this->gender,
-                'employee_dob' => $this->dob,
-                'employee_company_code' => $this->employeeCompanyCode,
-                'employee_joining_date' => $this->joiningDate,
-                'employee_leaving_date' => $this->leavingDate,
-                'employee_esi_no' => $this->esiNo,
-                'employee_pf_no' => $this->pfNo,
+                'company_id' => request()->session()->get("companyId"),
+                'first_name' => $this->firstName,
+                'middle_name' => $this->middleName,
+                'last_name' => $this->lastName,
+                'father_name' => $this->fatherName,
+                'gender' => strtoupper(substr($this->gender, 0, 1)), // Convert to M/F/O format
+                'dob' => $this->dob,
+                'company_code' => $this->employeeCompanyCode,
+                'joining_date' => $this->joiningDate,
+                'leaving_date' => $this->leavingDate ?: null,
+                'esi_no' => $this->esiNo,
+                'pf_no' => $this->pfNo,
                 'designation_id' => $this->designation,
                 'department_id' => $this->department,
-                'employee_age' => $this->calculateAge($this->dob)
+                'location_id' => $this->location ?: null,
             ]);
 
             session()->flash('success', 'Employee details saved successfully!');
@@ -115,42 +123,80 @@ class AddEmployeeDetails extends Component
         }
     }
 
+    /**
+     * Validate the Excel import input (file, department, and location)
+     * Returns an array of issues (empty if valid)
+     */
+    private function validateExcelImportInput()
+    {
+        $inputIssues = [];
+        if (empty($this->excelFile)) {
+            $inputIssues[] = 'Excel file is required.';
+        } elseif (!in_array($this->excelFile->getClientOriginalExtension(), ['xlsx', 'xls'])) {
+            $inputIssues[] = 'The file must be an Excel file (.xlsx or .xls).';
+        }
+        if (empty($this->importDepartment)) {
+            $inputIssues[] = 'Department is required for import.';
+        }
+        if (empty($this->importLocation)) {
+            $inputIssues[] = 'Location is required for import.';
+        }
+        return $inputIssues;
+    }
+
     public function importEmployees()
     {
-        $this->validate([
-            'excelFile' => 'required|mimes:xlsx,xls',
-            'importDepartment' => 'required'
-        ]);
-
+        // Validate input using the new function
+        $inputIssues = $this->validateExcelImportInput();
+        if (!empty($inputIssues)) {
+            $this->importError = implode("\n", $inputIssues);
+            return;
+        }
         try {
             $this->isImporting = true;
             $this->importMessage = '';
             $this->importError = '';
 
-            $import = new EmployeesImport($this->companyId, $this->importDepartment);
+            Log::info('Starting employee import', [
+                'user_id' => auth()->id(),
+                'company_id' => $this->companyId,
+                'department' => $this->importDepartment,
+                'location' => $this->importLocation,
+                'file_name' => $this->excelFile ? $this->excelFile->getClientOriginalName() : null
+            ]);
+
+            $import = new EmployeeImport($this->importLocation, $this->importDepartment);
             Excel::import($import, $this->excelFile);
 
-            $this->importMessage = 'Employees imported successfully!';
-            $this->reset(['excelFile', 'importDepartment']);
-        } catch (Exception $e) {
-            Log::error('Import failed: ' . $e->getMessage());
-            $this->importError = 'Failed to import employees. Please check the file format and try again.';
-        } finally {
+            $errors = $import->getErrors();
+            if (!empty($errors)) {
+                $this->importError = "Import failed. No data was imported. Errors:\n";
+                foreach ($errors as $error) {
+                    $this->importError .= "Row {$error['row']}, Column '{$error['field']}': {$error['message']}\n";
+                }
+                Log::warning('Employee import failed, no data imported', [
+                    'user_id' => auth()->id(),
+                    'company_id' => $this->companyId,
+                    'errors' => $errors
+                ]);
+                $this->isImporting = false;
+                return;
+            }
+            $import->processImport();
+            $this->importMessage = 'All employees imported successfully!';
+            $this->isImporting = false;
+        } catch (\Exception $e) {
+            $this->importError = 'Error importing data: ' . $e->getMessage();
             $this->isImporting = false;
         }
-    }
-
-    private function calculateAge($dob)
-    {
-        return \Carbon\Carbon::parse(time: $dob)->age; // Calculate age from date of birth
     }
 
     public function exportToExcel()
     {
         try {
             $query = Employee::query()
-                ->with(['department', 'designation'])  // Eager load the relationships
-                ->where('company_id', request()->session()->get('companyIdNum'));
+                ->with(['department', 'designation', 'location'])  // Eager load the relationships
+                ->where('company_id', request()->session()->get('companyId'));
 
             if ($this->selectedDepartment) {
                 $query->where('department_id', $this->selectedDepartment);

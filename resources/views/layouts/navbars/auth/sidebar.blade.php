@@ -1,13 +1,21 @@
 <aside class="sidenav navbar navbar-vertical navbar-expand-xs border-0 border-radius-xl my-3 fixed-start ms-3"
     id="sidenav-main">
-    <div class="sidenav-header">
-        <i class="fas fa-times p-3 cursor-pointer text-secondary opacity-5 position-absolute end-0 top-0 d-none d-xl-none"
-            aria-hidden="true" id="iconSidenav"></i>
-        <a class="align-items-center d-flex m-0 navbar-brand text-wrap" href="{{ route('dashboard', ['company_id' => request()->session()->get('companyId')])}}">
-            <img src="../assets/img/logo-ct.png" class="navbar-brand-img h-100" alt="...">
-            <span class="ms-3 font-weight-bold">Aryans Associates Payroll System</span>
-        </a>
+    <div class="sidenav-header d-flex align-items-center justify-content-between" style="flex-direction: row;">
+        <div class="d-flex align-items-center">
+            <a class="align-items-center d-flex m-0 navbar-brand text-wrap" href="{{ route('dashboard', ['company_id' => request()->session()->get('companyId')])}}">
+                <img src="../assets/img/logo-ct.png" class="navbar-brand-img h-100" alt="...">
+                <span class="ms-3 font-weight-bold">Aryans Associates Payroll System</span>
+            </a>
+        </div>
+        <!-- Collapse Button -->
+        <button id="sidebarCollapseBtn"
+            type="button"
+            class="btn"
+            style="font-size: 1.0rem; background: transparent; border: none; box-shadow: none; margin-left: 8px; padding: 4px;">
+            <i class="fa fa-times" style="color: #344767;"></i>
+        </button>
     </div>
+    
     <hr class="horizontal dark mt-0">
     <div class="collapse navbar-collapse w-auto h-100" id="sidenav-collapse-main">
         <ul class="navbar-nav">
@@ -75,7 +83,7 @@
             </li>
             <li class="nav-item">
                 <a class="nav-link {{ Route::currentRouteName() == 'view-employee-details' ? 'active' : '' }}"
-                    href="{{ route('view-employee-details') }}">
+                    href="{{ route('view-employee-details', ['company_id' => request()->session()->get('companyId')]) }}">
                     <div
                         class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
                         <svg width="12px" height="12px" viewBox="0 0 46 42" version="1.1"
@@ -107,7 +115,7 @@
 
             <li class="nav-item">
                 <a class="nav-link {{ Route::currentRouteName() == 'attendance-entry' ? 'active' : '' }}"
-                    href="{{ route('attendance-entry') }}">
+                    href="{{ route('attendance-entry', ['company_id' => request()->session()->get('companyId')]) }}">
                     <div
                         class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
                         <svg width="12px" height="12px" viewBox="0 0 46 42" version="1.1"
@@ -299,3 +307,80 @@
         </ul>
     </div>
 </aside>
+<!-- Floating Sidebar Toggle Button -->
+<button id="showSidebarBtn"
+    type="button"
+    style="
+        display: none;
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 1050;
+        font-size: 1.0rem;
+        background: #fff;
+        border: none;
+        border-radius: 50%;
+        box-shadow: 0 2px 6px rgba(52,71,103,0.15);
+        padding: 8px 12px;
+        color: #344767;
+        cursor: pointer;
+    ">
+    <i class="fa fa-bars"></i>
+</button>
+<script>
+    function updateSidebarToggleBtn() {
+        var showBtn = document.getElementById('showSidebarBtn');
+        if (!document.body.classList.contains('g-sidenav-pinned')) {
+            showBtn.style.display = 'block';
+        } else {
+            showBtn.style.display = 'none';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Close button
+        var sidebarBtn = document.getElementById('sidebarCollapseBtn');
+        if (sidebarBtn) {
+            sidebarBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.body.classList.remove('g-sidenav-pinned');
+                if (typeof updateSidebarToggleBtn === 'function') {
+                    setTimeout(updateSidebarToggleBtn, 350);
+                }
+            });
+        }
+
+        // Floating open button
+        var showBtn = document.getElementById('showSidebarBtn');
+        if (showBtn) {
+            showBtn.addEventListener('click', function() {
+                document.body.classList.add('g-sidenav-pinned');
+                if (typeof updateSidebarToggleBtn === 'function') {
+                    updateSidebarToggleBtn();
+                }
+            });
+        }
+
+        // Initial state
+        updateSidebarToggleBtn();
+    });
+</script>
+<style>
+  body:not(.g-sidenav-pinned) .sidenav {
+    width: 0 !important;
+    min-width: 0 !important;
+    overflow: hidden;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s, opacity 0.3s;
+    opacity: 0.2;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  body.g-sidenav-pinned .sidenav {
+    width: 250px;
+    min-width: 250px;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s, opacity 0.3s;
+    opacity: 1;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+</style>

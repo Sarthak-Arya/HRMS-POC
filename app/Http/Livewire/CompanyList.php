@@ -17,11 +17,10 @@ class CompanyList extends Component
     
 
     public function setCompanyId(){
-        redirect()->route('dashboard', ['company_id' => $this->company_id]);
+        redirect()->route('dashboard', ['company_id' => $this->company_id_num]);
         #companyId is the key which is being written in company_id in SQL
-        request()->session()->put('companyId', $this->company_id);
+        request()->session()->put('companyId', $this->company_id_num);
         #companyIdNum is the default primary key in the database which is made by SQL
-        request()->session()->put('companyIdNum', $this->company_id_num);
     }
 
     public function render()

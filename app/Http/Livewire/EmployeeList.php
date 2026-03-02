@@ -20,10 +20,11 @@ class EmployeeList extends Component
     public $selectedDepartment = '';
     public $selectedStatus = '';
     public $search = '';
+    public $selectedLocation = '';
 
     public function mount()
     {
-        $this->companyId = session()->get("companyIdNum");
+        $this->companyId = session()->get("companyId");
     }
 
     public function render()
@@ -39,29 +40,35 @@ class EmployeeList extends Component
             $query->where('department_id', $this->selectedDepartment);
         }
 
+        if ($this->selectedLocation) {
+            $query->where('location_id', $this->selectedLocation);
+        }
+
         if ($this->selectedStatus !== '') {
             if ($this->selectedStatus === 'active') {
-                $query->whereNull('employee_leaving_date');
+                $query->whereNull('leaving_date');
             } else {
-                $query->whereNotNull('employee_leaving_date');
+                $query->whereNotNull('leaving_date');
             }
         }
 
         if ($this->search) {
             $query->where(function($q) {
-                $q->where('employee_first_name', 'like', '%' . $this->search . '%')
-                  ->orWhere('employee_last_name', 'like', '%' . $this->search . '%');
+                $q->where('first_name', 'like', '%' . $this->search . '%')
+                  ->orWhere('last_name', 'like', '%' . $this->search . '%');
             });
         }
 
-        $employees = $query->paginate(10);
+        $employees = $query->paginate(30);
         $designations = Designation::where('company_id', $this->companyId)->get();
         $departments = Department::where('company_id', $this->companyId)->get();
+        $locations = \App\Models\Location::where('company_id', $this->companyId)->get();
 
         return view('livewire.employee-list', [
             'employees' => $employees,
             'designations' => $designations,
-            'departments' => $departments
+            'departments' => $departments,
+            'locations' => $locations
         ]);
     }
 
@@ -81,6 +88,11 @@ class EmployeeList extends Component
     }
 
     public function updatedSearch()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSelectedLocation()
     {
         $this->resetPage();
     }

@@ -15,8 +15,15 @@ class ImportExcel extends Controller
             'excel_file' => 'required|mimes:xlsx,xls,csv|max:2048',
         ]);
 
+        $import = new EmployeeImport();
         try {
-            Excel::import(new EmployeeImport, $request->file('excel_file'));
+            \Maatwebsite\Excel\Facades\Excel::import($import, $request->file('excel_file'));
+            $errors = $import->getErrors();
+            if (!empty($errors)) {
+                session()->flash('error', 'Import failed. No data was imported. Errors: ' . json_encode($errors));
+                return redirect()->back();
+            }
+            $import->processImport();
             session()->flash('success', 'Data imported successfully.');
             return redirect()->back();
         } catch (\Exception $e) {

@@ -15,6 +15,7 @@
     </title>
     
     <!-- Fonts and icons     -->
+    <script src="https://kit.fontawesome.com/bcb22c69aa.js" crossorigin="anonymous"></script>
     <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700" rel="stylesheet" />
     <!-- Nucleo Icons -->
     <link href="../assets/css/nucleo-icons.css" rel="stylesheet" />
@@ -28,6 +29,24 @@
     <!-- Alpine -->
     <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
     @livewireStyles
+    <style>
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  body.g-sidenav-pinned {
+    margin-left: 15.625rem;
+    width: calc(100% - 15.625rem);
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  body:not(.g-sidenav-pinned) .main-content {
+    margin-left: 0;
+    width: 100%;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+</style>
 
 </head>
 

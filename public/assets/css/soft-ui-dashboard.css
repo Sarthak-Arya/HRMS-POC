@@ -21681,7 +21681,7 @@ hr.horizontal.gray-light {
   .sidenav .sidenav-toggler {
     padding: 1.5rem;
   }
-  .sidenav.fixed-start ~ .main-content {
+  .sidenav.fixed-start {
     margin-left: 17.125rem;
   }
   .sidenav.fixed-end ~ .main-content {

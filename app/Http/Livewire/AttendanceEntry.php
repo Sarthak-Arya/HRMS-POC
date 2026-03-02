@@ -4,107 +4,103 @@ namespace App\Http\Livewire;
 
 use Livewire\Component;
 use Livewire\WithPagination;
+use Livewire\WithFileUploads;
 use App\Models\Employee;
-use App\Models\Attendance;
 use App\Models\Department;
 use App\Models\Designation;
+use App\Models\MonthlyAttendance;
+use App\Models\LeaveType;
+use App\Models\Location;
+use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use App\Exports\AttendanceTemplateExport;
 
 class AttendanceEntry extends Component
 {
-    use WithPagination;
+    use WithPagination, WithFileUploads;
 
     protected $paginationTheme = 'bootstrap';
 
-    public $from_date;
-    public $to_date;
+    public $month;
+    public $year;
     public $attendanceData = [];
     public $isEditMode = false;
     public $selectedDepartment = '';
     public $selectedDesignation = '';
     public $departments = [];
     public $designations = [];
+    public $leaveTypes = [];
+    public $excel_file;
+    public $selectedLocation = '';
+    public $locations = [];
 
     protected $rules = [
-        'from_date' => 'required|date',
-        'to_date' => 'required|date|after_or_equal:from_date',
-        'attendanceData.*.casual_leave' => 'nullable|numeric|min:0',
-        'attendanceData.*.earned_leave' => 'nullable|numeric|min:0',
-        'attendanceData.*.maternity_leave' => 'nullable|numeric|min:0',
-        'attendanceData.*.earnings.*.name' => 'required_with:attendanceData.*.earnings.*.amount|string',
-        'attendanceData.*.earnings.*.amount' => 'required_with:attendanceData.*.earnings.*.name|numeric|min:0',
-        'attendanceData.*.deductions.*.name' => 'required_with:attendanceData.*.deductions.*.amount|string',
-        'attendanceData.*.deductions.*.amount' => 'required_with:attendanceData.*.deductions.*.amount|numeric|min:0',
+        'month' => 'required|integer|min:1|max:12',
+        'year' => 'required|integer|min:2000',
+        'excel_file' => 'nullable|file|mimes:xlsx,xls',
     ];
 
     public function mount()
     {
-        $this->from_date = Carbon::now()->format('Y-m-d');
-        $this->to_date = Carbon::now()->format('Y-m-d');
+        $companyId = session()->get('companyId');
+        $this->locations = Location::where('company_id', $companyId)->get();
+        $this->month = now()->month;
+        $this->year = now()->year;
         $this->loadDepartmentsAndDesignations();
+        $this->loadLeaveTypes();
     }
 
     public function loadDepartmentsAndDesignations()
     {
-        $companyId = session()->get("companyIdNum");
-        $this->departments = Department::where('company_id', $companyId)->get();
-        $this->designations = Designation::where('company_id', $companyId)->get();
+        $companyId = session()->get('companyIdNum');
+        $locationId = $this->selectedLocation ?: session()->get('locationIdNum');
+        $this->departments = Department::where('company_id', $companyId)
+            ->when($locationId, function($q) use ($locationId) { return $q->where('location_id', $locationId); })
+            ->get();
+        $this->designations = Designation::where('company_id', $companyId)
+            ->when($locationId, function($q) use ($locationId) { return $q->where('location_id', $locationId); })
+            ->get();
     }
 
-    public function updatedFromDate()
+    public function loadLeaveTypes()
     {
-        $this->validateOnly('from_date');
-        if ($this->to_date && Carbon::parse($this->from_date)->gt(Carbon::parse($this->to_date))) {
-            $this->to_date = $this->from_date;
-        }
-        $this->loadExistingAttendance();
+        $companyId = session()->get('companyIdNum');
+        $locationId = $this->selectedLocation ?: session()->get('locationIdNum');
+        $this->leaveTypes = LeaveType::where('company_id', $companyId)
+            ->when($locationId, function($q) use ($locationId) { return $q->where('location_id', $locationId); })
+            ->get();
     }
 
-    public function updatedToDate()
+    public function updatedMonth()
     {
-        $this->validateOnly('to_date');
-        $this->loadExistingAttendance();
+        $this->resetPage();
+        $this->attendanceData = [];
     }
 
-    public function loadExistingAttendance()
+    public function updatedYear()
     {
-        if ($this->from_date && $this->to_date) {
-            $employees = $this->getEmployeesQuery()->get();
-            
-            foreach ($employees as $employee) {
-                $attendance = Attendance::where('employee_id', $employee->id)
-                    ->where(function($query) {
-                        $query->whereBetween('from_date', [$this->from_date, $this->to_date])
-                              ->orWhereBetween('to_date', [$this->from_date, $this->to_date]);
-                    })
-                    ->first();
+        $this->resetPage();
+        $this->attendanceData = [];
+    }
 
-                if ($attendance) {
-                    $this->attendanceData[$employee->id] = [
-                        'casual_leave' => $attendance->casual_leave,
-                        'earned_leave' => $attendance->earned_leave,
-                        'maternity_leave' => $attendance->maternity_leave,
-                        'earnings' => $attendance->earnings ?? [],
-                        'deductions' => $attendance->deductions ?? []
-                    ];
-                }
-            }
-        }
+    public function updatedSelectedLocation()
+    {
+        $this->loadDepartmentsAndDesignations();
+        $this->loadLeaveTypes();
+        $this->attendanceData = [];
+        $this->resetPage();
     }
 
     protected function getEmployeesQuery()
     {
-        $query = Employee::whereNull('employee_leaving_date')
-            ->with(['department', 'designation']);
-
+        $query = Employee::whereNull('leaving_date');
         if ($this->selectedDepartment) {
             $query->where('department_id', $this->selectedDepartment);
         }
-
         if ($this->selectedDesignation) {
             $query->where('designation_id', $this->selectedDesignation);
         }
-
         return $query;
     }
 
@@ -113,80 +109,135 @@ class AttendanceEntry extends Component
         $this->isEditMode = !$this->isEditMode;
     }
 
-    public function addEarning($employeeId)
-    {
-        $this->attendanceData[$employeeId]['earnings'][] = ['name' => '', 'amount' => ''];
-    }
-
-    public function removeEarning($employeeId, $index)
-    {
-        unset($this->attendanceData[$employeeId]['earnings'][$index]);
-        $this->attendanceData[$employeeId]['earnings'] = array_values($this->attendanceData[$employeeId]['earnings']);
-    }
-
-    public function addDeduction($employeeId)
-    {
-        $this->attendanceData[$employeeId]['deductions'][] = ['name' => '', 'amount' => ''];
-    }
-
-    public function removeDeduction($employeeId, $index)
-    {
-        unset($this->attendanceData[$employeeId]['deductions'][$index]);
-        $this->attendanceData[$employeeId]['deductions'] = array_values($this->attendanceData[$employeeId]['deductions']);
-    }
-
-    public function getDaysProperty()
-    {
-        if ($this->from_date && $this->to_date) {
-            return Carbon::parse($this->from_date)->diffInDays(Carbon::parse($this->to_date)) + 1;
-        }
-        return 0;
-    }
-
     public function save()
     {
-        $this->validate();
-
+        $this->validateOnly('month');
+        $this->validateOnly('year');
         foreach ($this->attendanceData as $employeeId => $data) {
-            Attendance::updateOrCreate(
+            $leave_taken = [];
+            foreach ($this->leaveTypes as $leaveType) {
+                $code = strtolower($leaveType->leave_code);
+                $leave_taken[$code] = $data['leave_taken'][$code] ?? 0;
+            }
+            MonthlyAttendance::updateOrCreate(
                 [
                     'employee_id' => $employeeId,
-                    'from_date' => $this->from_date,
-                    'to_date' => $this->to_date
+                    'month' => $this->month,
+                    'year' => $this->year,
                 ],
                 [
-                    'days' => $this->days,
-                    'casual_leave' => $data['casual_leave'] ?? 0,
-                    'earned_leave' => $data['earned_leave'] ?? 0,
-                    'maternity_leave' => $data['maternity_leave'] ?? 0,
-                    'earnings' => $data['earnings'],
-                    'deductions' => $data['deductions']
+                    'total_working_days' => $data['total_working_days'] ?? 0,
+                    'days_present' => $data['days_present'] ?? 0,
+                    'days_half_day' => $data['days_half_day'] ?? 0,
+                    'days_late' => $data['days_late'] ?? 0,
+                    'total_hours_worked' => $data['total_hours_worked'] ?? 0,
+                    'overtime_hours' => $data['overtime_hours'] ?? 0,
+                    'total_leave_days' => $data['total_leave_days'] ?? 0,
+                    'leave_taken' => $leave_taken,
+                    'holiday_days' => $data['holiday_days'] ?? 0,
+                    'remarks' => $data['remarks'] ?? null,
                 ]
             );
         }
+        session()->flash('message', 'Monthly attendance saved successfully.');
+        $this->isEditMode = false;
+    }
 
-        session()->flash('message', 'Attendance data saved successfully.');
+    public function importExcel()
+    {
+        $this->validateOnly('excel_file');
+        if (!$this->excel_file) {
+            session()->flash('import_message', 'Please select an Excel file.');
+            return;
+        }
+        try {
+            $leaveCodes = $this->leaveTypes->pluck('leave_code')->map(function($code) { return strtolower($code); })->toArray();
+            $path = $this->excel_file->getRealPath();
+            $rows = Excel::toArray(null, $path)[0];
+            $header = array_map('strtolower', $rows[0]);
+            unset($rows[0]);
+            foreach ($rows as $row) {
+                $data = array_combine($header, $row);
+                if (empty($data['employee_id']) || empty($data['month']) || empty($data['year'])) {
+                    continue;
+                }
+                $leave_taken = [];
+                foreach ($leaveCodes as $code) {
+                    $leave_taken[$code] = isset($data[$code]) ? $data[$code] : 0;
+                }
+                MonthlyAttendance::updateOrCreate(
+                    [
+                        'employee_id' => $data['employee_id'],
+                        'month' => $data['month'],
+                        'year' => $data['year'],
+                    ],
+                    [
+                        'total_working_days' => $data['total_working_days'] ?? 0,
+                        'days_present' => $data['days_present'] ?? 0,
+                        'days_half_day' => $data['days_half_day'] ?? 0,
+                        'days_late' => $data['days_late'] ?? 0,
+                        'total_hours_worked' => $data['total_hours_worked'] ?? 0,
+                        'overtime_hours' => $data['overtime_hours'] ?? 0,
+                        'total_leave_days' => $data['total_leave_days'] ?? 0,
+                        'leave_taken' => $leave_taken,
+                        'holiday_days' => $data['holiday_days'] ?? 0,
+                        'remarks' => $data['remarks'] ?? null,
+                    ]
+                );
+            }
+            session()->flash('import_message', 'Monthly attendance imported successfully.');
+        } catch (\Exception $e) {
+            Log::error('Attendance import error: ' . $e->getMessage());
+            session()->flash('import_message', 'Error importing attendance: ' . $e->getMessage());
+        }
+    }
+
+    public function downloadTemplate()
+    {
+        $companyId = session()->get('companyIdNum');
+        $locationId = $this->selectedLocation ?: session()->get('locationIdNum');
+        $leaveTypes = LeaveType::where('company_id', $companyId)
+            ->when($locationId, function($q) use ($locationId) { return $q->where('location_id', $locationId); })
+            ->get();
+        $leaveCodes = $leaveTypes->pluck('leave_code')->map(function($code) { return strtoupper($code); })->toArray();
+        $columns = array_merge([
+            'employee_id', 'month', 'year', 'total_working_days', 'days_present', 'days_half_day', 'days_late', 'total_hours_worked', 'overtime_hours', 'total_leave_days'
+        ], $leaveCodes, ['holiday_days', 'remarks']);
+        $sampleRow = array_fill(0, count($columns), '');
+        return \Maatwebsite\Excel\Facades\Excel::download(new AttendanceTemplateExport($columns, [$sampleRow]), 'monthly_attendance_template.xlsx');
     }
 
     public function render()
     {
         $employees = $this->getEmployeesQuery()->paginate(10);
-
-        // Initialize attendance data for new employees
         foreach ($employees as $employee) {
-            if (!isset($this->attendanceData[$employee->id])) {
-                $this->attendanceData[$employee->id] = [
-                    'casual_leave' => 0,
-                    'earned_leave' => 0,
-                    'maternity_leave' => 0,
-                    'earnings' => [],
-                    'deductions' => []
-                ];
+            $attendance = MonthlyAttendance::where('employee_id', $employee->id)
+                ->where('month', $this->month)
+                ->where('year', $this->year)
+                ->first();
+            $leave_taken = [];
+            foreach ($this->leaveTypes as $leaveType) {
+                $code = strtolower($leaveType->leave_code);
+                $leave_taken[$code] = $attendance->leave_taken[$code] ?? 0;
             }
+            $this->attendanceData[$employee->id] = [
+                'total_working_days' => $attendance->total_working_days ?? 0,
+                'days_present' => $attendance->days_present ?? 0,
+                'days_half_day' => $attendance->days_half_day ?? 0,
+                'days_late' => $attendance->days_late ?? 0,
+                'total_hours_worked' => $attendance->total_hours_worked ?? 0,
+                'overtime_hours' => $attendance->overtime_hours ?? 0,
+                'total_leave_days' => $attendance->total_leave_days ?? 0,
+                'leave_taken' => $leave_taken,
+                'holiday_days' => $attendance->holiday_days ?? 0,
+                'remarks' => $attendance->remarks ?? '',
+            ];
         }
-
         return view('livewire.attendance-entry', [
-            'employees' => $employees
+            'employees' => $employees,
+            'leaveTypes' => $this->leaveTypes,
+            'locations' => $this->locations,
+            'selectedLocation' => $this->selectedLocation,
         ]);
     }
 } 

@@ -61,6 +61,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/add-company-details', AddCompanyDetails::class)->name('add-company-details');
     Route::get('/view-companies', ViewCompanies::class)->name('view-companies');
     Route::post('/import-excel', [App\Http\Controllers\ImportExcel::class, 'import'])->name('import.excel');
+    
+    // Employee template download route
+    Route::get('/download-employee-template', [App\Http\Controllers\EmployeeTemplateController::class, 'downloadTemplate'])->name('download.template');
 
     Route::prefix('{company_id}')->group(function () {
         Route::middleware(CompanyAccessMiddleware::class)->group(function () {
@@ -69,6 +72,8 @@ Route::middleware('auth')->group(function () {
             Route::get('/dashboard', action: Dashboard::class)->name('dashboard');
             Route::get('/compensation-structures', action: CompensationStructureManager::class)->name('compensation-structures');
             Route::get('/salary-generator', action: SalaryGenerator::class)->name('salary-generator');
+            Route::get('/view-employee-details', action: EmployeeList::class)->name('view-employee-details');
+            Route::get('/attendance-entry', AttendanceEntry::class)->name('attendance-entry');
         });
         
     });
@@ -77,8 +82,5 @@ Route::middleware('auth')->group(function () {
     Route::get('/static-sign-in', action: StaticSignIn::class)->name('sign-in');
     Route::get('/static-sign-up', action: StaticSignUp::class)->name('static-sign-up');
     Route::get('/rtl', Rtl::class)->name('rtl');
-    Route::get('/view-employee-details', EmployeeList::class)->name('view-employee-details');
-
-    Route::get('/attendance-entry', AttendanceEntry::class)->name('attendance-entry');
 });
 

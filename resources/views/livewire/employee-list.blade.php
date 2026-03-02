@@ -14,7 +14,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="form-group">
                             <label class="form-control-label">Filter by Designation</label>
                             <select wire:model.live="selectedDesignation" class="form-control">
@@ -25,7 +25,7 @@
                             </select>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="form-group">
                             <label class="form-control-label">Filter by Department</label>
                             <select wire:model.live="selectedDepartment" class="form-control">
@@ -36,7 +36,18 @@
                             </select>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label class="form-control-label">Filter by Location</label>
+                            <select wire:model.live="selectedLocation" class="form-control">
+                                <option value="">All Locations</option>
+                                @foreach($locations as $location)
+                                    <option value="{{ $location->id }}">{{ $location->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
                         <div class="form-group">
                             <label class="form-control-label">Filter by Status</label>
                             <select wire:model.live="selectedStatus" class="form-control">
@@ -60,6 +71,7 @@
                             <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Full Name</th>
                             <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Designation</th>
                             <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Department</th>
+                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Location</th>
                             <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Joining Date</th>
                             <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Status</th>
                             <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Actions</th>
@@ -78,7 +90,7 @@
                                 <td>
                                     <div class="d-flex px-2 py-1">
                                         <div class="d-flex flex-column justify-content-center">
-                                            <h6 class="mb-0 text-sm">{{ $employee->employee_first_name }} {{ $employee->employee_last_name }}</h6>
+                                            <h6 class="mb-0 text-sm">{{ $employee->first_name }} {{ $employee->middle_name }} {{ $employee->last_name }}</h6>
                                         </div>
                                     </div>
                                 </td>
@@ -89,11 +101,14 @@
                                     <p class="text-xs font-weight-bold mb-0">{{ $employee->department->department_name ?? 'N/A' }}</p>
                                 </td>
                                 <td>
-                                    <p class="text-xs font-weight-bold mb-0">{{ $employee->employee_joining_date->format('d/m/Y') }}</p>
+                                    <p class="text-xs font-weight-bold mb-0">{{ $employee->location->name ?? 'N/A' }}</p>
                                 </td>
                                 <td>
-                                    <span class="badge badge-sm {{ $employee->employee_leaving_date ? 'bg-gradient-danger' : 'bg-gradient-success' }}">
-                                        {{ $employee->employee_leaving_date ? 'Inactive' : 'Active' }}
+                                    <p class="text-xs font-weight-bold mb-0">{{ $employee->joining_date->format('d/m/Y') }}</p>
+                                </td>
+                                <td>
+                                    <span class="badge badge-sm {{ $employee->leaving_date ? 'bg-gradient-danger' : 'bg-gradient-success' }}">
+                                        {{ $employee->leaving_date ? 'Inactive' : 'Active' }}
                                     </span>
                                 </td>
                                 <td class="align-middle">

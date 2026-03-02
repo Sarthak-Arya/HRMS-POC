@@ -3,7 +3,7 @@
 namespace App\Http\Livewire;
 use App\Models\Company;
 use Livewire\Component;
-
+use Illuminate\Support\Facades\Log;
 class Dashboard extends Component
 {
     public string $companyName;
@@ -12,7 +12,8 @@ class Dashboard extends Component
     public function boot(){
 
     $companyId = request()->session()->get('companyId');
-    $company = Company::where('company_id', $companyId)->first();
+    Log::info(message: "companyId: ".$companyId);
+    $company = Company::where('id', operator: $companyId)->first();
     $this->companyName = $company->company_name;
     }
     // #[Url]

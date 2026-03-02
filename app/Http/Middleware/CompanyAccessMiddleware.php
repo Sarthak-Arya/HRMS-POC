@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Company;
+use Illuminate\Support\Facades\Log;
 
 class CompanyAccessMiddleware
 {
@@ -17,7 +18,7 @@ class CompanyAccessMiddleware
             abort(404, message: 'Company ID not found in URL.');
         }
 
-        $company = Company::where('company_id', $companyId)->first();
+        $company = Company::where('id', $companyId)->first();
 
         if (!$company) {
             abort(404, 'Company not found.');
@@ -33,7 +34,8 @@ class CompanyAccessMiddleware
             return redirect()->route('login')->with('error', 'Please log in to access this page.');
         }
 
-        $handledBy = $company['handled_by'];
+        $handledBy = $company['company_handled_by'];
+    
         if ($user->id != $handledBy) {
             abort(403, 'You do not have permission to access this company.');
         }

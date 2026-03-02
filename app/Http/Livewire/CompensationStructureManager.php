@@ -4,6 +4,8 @@ namespace App\Http\Livewire;
 
 use Livewire\Component;
 use App\Models\CompensationStructure;
+use App\Models\CompensationComponent;
+use App\Models\CompensationStructureComponent;
 use App\Models\Department;
 use App\Models\Designation;
 
@@ -12,21 +14,22 @@ class CompensationStructureManager extends Component
     public $showModal = false;
     public $editMode = false;
     public $selectedId = null;
-    public $designation_id = '';
-    public $department_id = '';
-
+    public $applies_to_type = 'department'; // default, can be changed as needed
+    public $applies_to_id = '';
     public $company_id = '';
     public $name = '';
     public $compensations = [];
-    public $availableTypes = ['BASIC', 'HRA', 'DA', 'TA', 'MA', 'Other Allowances'];
+    public $availableComponents = [];
     public $departments = [];
     public $designations = [];
 
     protected $rules = [
-        'designation_id' => 'required|exists:designations,id',
-        'department_id' => 'required|exists:departments,id',
-        'compensations.*.type' => 'required|string',
-        'compensations.*.percentage' => 'required|numeric|min:0|max:100',
+        'name' => 'required|string',
+        'applies_to_type' => 'required|in:company,department,location,employee',
+        'applies_to_id' => 'nullable|integer',
+        'compensations.*.component_id' => 'required|exists:compensation_components,id',
+        'compensations.*.amount_type' => 'required|in:fixed,percentage',
+        'compensations.*.value' => 'required|numeric|min:0',
     ];
 
     public function mount()
@@ -34,15 +37,16 @@ class CompensationStructureManager extends Component
         $this->company_id = session()->get("companyIdNum");
         $this->departments = Department::where('company_id', $this->company_id)->get();
         $this->designations = Designation::where('company_id', $this->company_id)->get();
-        
+        $this->availableComponents = CompensationComponent::all();
         $this->addCompensationRow();
     }
 
     public function addCompensationRow()
     {
         $this->compensations[] = [
-            'type' => '',
-            'percentage' => '',
+            'component_id' => '',
+            'amount_type' => 'fixed',
+            'value' => '',
         ];
     }
 
@@ -54,11 +58,19 @@ class CompensationStructureManager extends Component
 
     public function editCompensation($id)
     {
-        $compensation = CompensationStructure::findOrFail($id);
+        $structure = CompensationStructure::with('components')->findOrFail($id);
         $this->selectedId = $id;
-        $this->designation_id = $compensation->designation_id;
-        $this->department_id = $compensation->department_id;
-        $this->compensations = json_decode($compensation->structure, true);
+        $this->name = $structure->name;
+        $this->applies_to_type = $structure->applies_to_type;
+        $this->applies_to_id = $structure->applies_to_id;
+        $this->compensations = [];
+        foreach ($structure->components as $component) {
+            $this->compensations[] = [
+                'component_id' => $component->id,
+                'amount_type' => $component->pivot->amount_type,
+                'value' => $component->pivot->value,
+            ];
+        }
         $this->editMode = true;
         $this->showModal = true;
     }
@@ -73,29 +85,38 @@ class CompensationStructureManager extends Component
     {
         $this->validate();
 
-        // Check for duplicate compensation types
-        $types = array_column($this->compensations, 'type');
-        if (count($types) !== count(array_unique($types))) {
-            $this->addError('compensations', 'Duplicate compensation types are not allowed.');
+        // Check for duplicate component_ids
+        $componentIds = array_column($this->compensations, 'component_id');
+        if (count($componentIds) !== count(array_unique($componentIds))) {
+            $this->addError('compensations', 'Duplicate compensation components are not allowed.');
             return;
         }
 
         $data = [
             'company_id' => $this->company_id,
-            'designation_id' => $this->designation_id,
-            'department_id' => $this->department_id,
-            'name' =>$this->department_id,
-            'structure' => json_encode($this->compensations),
+            'name' => $this->name,
+            'applies_to_type' => $this->applies_to_type,
+            'applies_to_id' => $this->applies_to_id,
         ];
 
         if ($this->editMode) {
-            CompensationStructure::findOrFail($this->selectedId)->update($data);
-            session()->flash('success', 'Compensation structure updated successfully.');
+            $structure = CompensationStructure::findOrFail($this->selectedId);
+            $structure->update($data);
         } else {
-            CompensationStructure::create($data);
-            session()->flash('success', 'Compensation structure created successfully.');
+            $structure = CompensationStructure::create($data);
         }
 
+        // Sync components in the pivot table
+        $syncData = [];
+        foreach ($this->compensations as $row) {
+            $syncData[$row['component_id']] = [
+                'amount_type' => $row['amount_type'],
+                'value' => $row['value'],
+            ];
+        }
+        $structure->components()->sync($syncData);
+
+        session()->flash('success', $this->editMode ? 'Compensation structure updated successfully.' : 'Compensation structure created successfully.');
         $this->resetForm();
     }
 
@@ -105,8 +126,9 @@ class CompensationStructureManager extends Component
             'showModal',
             'editMode',
             'selectedId',
-            'designation_id',
-            'department_id',
+            'name',
+            'applies_to_type',
+            'applies_to_id',
             'compensations',
         ]);
         $this->addCompensationRow();
@@ -114,9 +136,12 @@ class CompensationStructureManager extends Component
 
     public function render()
     {
-        $structures = CompensationStructure::with(relations: ['designation', 'department'])->get();
+        $structures = CompensationStructure::with(['components', 'company'])->where('company_id', $this->company_id)->get();
         return view('livewire.compensation-structure', [
-            'structures' => $structures
+            'structures' => $structures,
+            'availableComponents' => $this->availableComponents,
+            'departments' => $this->departments,
+            'designations' => $this->designations,
         ]);
     }
 } 

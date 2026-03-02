@@ -13,8 +13,11 @@
         </div>
     @endif
     <div class="container-fluid py-4" x-data="{ showModal: false, showImportModal: false}">
-        <!-- Export button -->
+        <!-- Action buttons -->
         <div class="d-flex justify-content-end">
+            <a href="{{ route('download.template') }}" class="btn bg-gradient-info btn-md me-2">
+                <i class="fas fa-download me-2"></i>Import Excel Template
+            </a>
             <button class="btn bg-gradient-dark btn-md me-2" @click="showModal = true">{{ 'Export Details' }}</button>
             <button class="btn bg-gradient-dark btn-md" @click="showImportModal = true">{{ 'Import Details' }}</button>
         </div>
@@ -67,12 +70,35 @@
                         <div class="modal-body">
                             @if($importMessage)
                                 <div class="alert alert-success">
-                                    {{ $importMessage }}
+                                    <h6 class="alert-heading">Import Results</h6>
+                                    @php
+                                        $lines = explode("\n", $importMessage);
+                                        $summary = array_shift($lines); // Get the first line (summary)
+                                        $customErrors = array_filter($lines); // Get remaining lines (errors)
+                                    @endphp
+                                    <p class="mb-2">{{ $summary }}</p>
+                                    @if(!empty($customErrors))
+                                        <hr>
+                                        <h6 class="mb-2">Errors Found:</h6>
+                                        <ul class="mb-0">
+                                            @foreach($customErrors as $error)
+                                                <li class="text-danger">{{ trim($error) }}</li>
+                                            @endforeach
+                                        </ul>
+                                    @endif
                                 </div>
                             @endif
                             @if($importError)
                                 <div class="alert alert-danger">
-                                    {{ $importError }}
+                                    <h6 class="alert-heading">Import Failed</h6>
+                                    @php
+                                        $errorLines = explode("\n", $importError);
+                                    @endphp
+                                    @foreach($errorLines as $line)
+                                        @if(trim($line))
+                                            <p class="mb-1">{{ trim($line) }}</p>
+                                        @endif
+                                    @endforeach
                                 </div>
                             @endif
                             <form wire:submit.prevent="importEmployees">
@@ -87,6 +113,19 @@
                                     </select>
                                     @if($importDepartment === 'all')
                                         <small class="text-muted">If 'All Departments' is selected, your Excel must include a Department column.</small>
+                                    @endif
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label class="form-control-label">Location</label>
+                                    <select wire:model="importLocation" class="form-control" required>
+                                        <option value="">Select Location</option>
+                                        <option value="all">All Locations</option>
+                                        @foreach($locations as $location)
+                                            <option value="{{ $location->id }}">{{ $location->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    @if($importLocation === 'all')
+                                        <small class="text-muted">If 'All Locations' is selected, your Excel must include a Location column.</small>
                                     @endif
                                 </div>
                                 <div class="form-group mb-3">
@@ -128,7 +167,7 @@
                             <input wire:model="firstName" class="form-control" type="text" placeholder="First Name" id="first-name">
                         </div>
                         <div>
-                            @error('form.firstName') <span class="error">{{ $message }}</span> @enderror
+                            @error('firstName') <span class="error">{{ $message }}</span> @enderror
                         </div>
 
                     </div>
@@ -183,7 +222,7 @@
             <h5 class="mt-3">Professional Details</h5>
             <hr>
             <div class="row">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="form-group">
                         <label for="company-name" class="form-control-label">Company Name</label>
                         <div>
@@ -191,7 +230,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="form-group">
                         <label for="designation" class="form-control-label">Designation</label>
                         <div>
@@ -199,7 +238,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="form-group">
                         <label for="department" class="form-control-label">Department</label>
                         <div>
@@ -207,6 +246,23 @@
                                 @if (count($departments) !=  0)
                                     @foreach ($departments as $department)  
                                     <option value="{{$department->id}}">{{$department->department_name}}</option>
+                                    @endforeach
+                                @else
+                                    <option value="" default>None</option>
+                                @endif
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="location" class="form-control-label">Location</label>
+                        <div>
+                            <select wire:model="location" class="form-control" id="location" data-live-search="true">
+                                <option value="">Select Location</option>
+                                @if (count($locations) !=  0)
+                                    @foreach ($locations as $location)  
+                                    <option value="{{$location->id}}">{{$location->name}}</option>
                                     @endforeach
                                 @else
                                     <option value="" default>None</option>

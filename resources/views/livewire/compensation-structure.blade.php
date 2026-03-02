@@ -26,17 +26,19 @@
                     <div class="col-md-4 mb-4">
                         <div class="card">
                             <div class="card-body">
-                                <h5 class="card-title">{{ $structure->designation->designation_name }} - {{ $structure->department->department_name }}</h5>
+                                <h5 class="card-title">{{ $structure->name }}</h5>
+                                <div class="mb-2">
+                                    <span class="badge bg-secondary">Applies to: {{ ucfirst($structure->applies_to_type) }} {{ $structure->applies_to_id }}</span>
+                                </div>
                                 <div class="mt-3">
-                                    @foreach(json_decode($structure->structure) as $comp)
+                                    @foreach($structure->components as $comp)
                                         <span class="badge bg-gradient-dark me-2 mb-2">
-                                            {{$comp->type}}:{{$comp->percentage}}% 
+                                            {{ $comp->name }}: {{ $comp->pivot->amount_type }} {{ $comp->pivot->value }}
                                         </span>
                                     @endforeach
                                 </div>
                                 <div class="mt-3">
-                                    <button class="btn btn-
-                                     btn-primary me-2" wire:click="editCompensation({{ $structure->id }})">
+                                    <button class="btn btn-primary me-2" wire:click="editCompensation({{ $structure->id }})">
                                         Edit
                                     </button>
                                     <button class="btn btn-sm btn-danger" wire:click="deleteCompensation({{ $structure->id }})">
@@ -64,51 +66,57 @@
                         </div>
                         <div class="modal-body">
                             <form wire:submit.prevent="save">
-                                <div class="row">
+                                <div class="mb-3">
+                                    <label for="structureName" class="form-label">Structure Name</label>
+                                    <input type="text" wire:model="name" class="form-control" id="structureName" placeholder="Enter structure name">
+                                    @error('name') <span class="text-danger">{{ $message }}</span> @enderror
+                                </div>
+                                <div class="row mb-3">
                                     <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label for="designation" class="form-control-label">Designation</label>
-                                            <select wire:model="designation_id" class="form-control" id="designation">
-                                                <option value="">Select Designation</option>
-                                                @foreach($designations as $designation)
-                                                    <option value="{{ $designation->id }}">{{ $designation->designation_name }}</option>
-                                                @endforeach
-                                            </select>
-                                            @error('designation_id') <span class="text-danger">{{ $message }}</span> @enderror
-                                        </div>
+                                        <label for="appliesToType" class="form-label">Applies To Type</label>
+                                        <select wire:model="applies_to_type" class="form-control" id="appliesToType">
+                                            <option value="company">Company</option>
+                                            <option value="department">Department</option>
+                                            <option value="location">Location</option>
+                                            <option value="employee">Employee</option>
+                                        </select>
+                                        @error('applies_to_type') <span class="text-danger">{{ $message }}</span> @enderror
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label for="department" class="form-control-label">Department</label>
-                                            <select wire:model="department_id" class="form-control" id="department">
-                                                <option value="">Select Department</option>
-                                                @foreach($departments as $department)
-                                                    <option value="{{ $department->id }}">{{ $department->department_name }}</option>
-                                                @endforeach
-                                            </select>
-                                            @error('department_id') <span class="text-danger">{{ $message }}</span> @enderror
-                                        </div>
+                                        <label for="appliesToId" class="form-label">Applies To ID</label>
+                                        <input type="text" wire:model="applies_to_id" class="form-control" id="appliesToId" placeholder="Enter ID (e.g. department id)">
+                                        @error('applies_to_id') <span class="text-danger">{{ $message }}</span> @enderror
                                     </div>
                                 </div>
 
                                 <div class="mt-4">
-                                    <h6>Compensation Details</h6>
+                                    <h6>Compensation Components</h6>
                                     @foreach($compensations as $index => $compensation)
-                                        <div class="row mb-3">
-                                            <div class="col-md-6">
-                                                <select wire:model="compensations.{{ $index }}.type" class="form-control">
-                                                    <option value="">Select Type</option>
-                                                    @foreach($availableTypes as $type)
-                                                        <option value="{{ $type }}">{{ $type }}</option>
+                                        <div class="row mb-3 align-items-end">
+                                            <div class="col-md-5">
+                                                <label class="form-label">Component</label>
+                                                <select wire:model="compensations.{{ $index }}.component_id" class="form-control">
+                                                    <option value="">Select Component</option>
+                                                    @foreach($availableComponents as $component)
+                                                        <option value="{{ $component->id }}">{{ $component->name }}</option>
                                                     @endforeach
                                                 </select>
-                                                @error("compensations.{$index}.type") <span class="text-danger">{{ $message }}</span> @enderror
+                                                @error("compensations.{$index}.component_id") <span class="text-danger">{{ $message }}</span> @enderror
                                             </div>
-                                            <div class="col-md-4">
-                                                <input type="number" wire:model="compensations.{{ $index }}.percentage" class="form-control" placeholder="Percentage">
-                                                @error("compensations.{$index}.percentage") <span class="text-danger">{{ $message }}</span> @enderror
+                                            <div class="col-md-3">
+                                                <label class="form-label">Amount Type</label>
+                                                <select wire:model="compensations.{{ $index }}.amount_type" class="form-control">
+                                                    <option value="fixed">Fixed</option>
+                                                    <option value="percentage">Percentage</option>
+                                                </select>
+                                                @error("compensations.{$index}.amount_type") <span class="text-danger">{{ $message }}</span> @enderror
                                             </div>
-                                            <div class="col-md-2">
+                                            <div class="col-md-3">
+                                                <label class="form-label">Value</label>
+                                                <input type="number" wire:model="compensations.{{ $index }}.value" class="form-control" placeholder="Value">
+                                                @error("compensations.{$index}.value") <span class="text-danger">{{ $message }}</span> @enderror
+                                            </div>
+                                            <div class="col-md-1">
                                                 <button type="button" class="btn btn-danger" wire:click="removeCompensationRow({{ $index }})">X</button>
                                             </div>
                                         </div>
