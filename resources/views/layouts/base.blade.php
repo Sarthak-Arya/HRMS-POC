@@ -18,14 +18,14 @@
     <script src="https://kit.fontawesome.com/bcb22c69aa.js" crossorigin="anonymous"></script>
     <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700" rel="stylesheet" />
     <!-- Nucleo Icons -->
-    <link href="../assets/css/nucleo-icons.css" rel="stylesheet" />
-    <link href="../assets/css/nucleo-svg.css" rel="stylesheet" />
+    <link href="{{ asset('assets/css/nucleo-icons.css') }}" rel="stylesheet" />
+    <link href="{{ asset('assets/css/nucleo-svg.css') }}" rel="stylesheet" />
     <!-- Font Awesome Icons -->
     <script src="https://kit.fontawesome.com/42d5adcbca.js" crossorigin="anonymous"></script>
-    <link href="../assets/css/nucleo-svg.css" rel="stylesheet" />
+    <link href="{{ asset('assets/css/nucleo-svg.css') }}" rel="stylesheet" />
     <!-- CSS Files -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link id="pagestyle" href="../assets/css/soft-ui-dashboard.css?v=1" rel="stylesheet" />
+    <link id="pagestyle" href="{{ asset('assets/css/soft-ui-dashboard.css') }}?v=1" rel="stylesheet" />
     <!-- Alpine -->
     <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
     @livewireStyles
@@ -46,6 +46,45 @@
     width: 100%;
     transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
+
+  /* Theme: dark */
+  body.theme-dark {
+    --bs-body-bg: #0b1220;
+    --bs-body-color: #e5e7eb;
+    background-color: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+  }
+  body.theme-dark .card,
+  body.theme-dark .modal-content,
+  body.theme-dark .dropdown-menu {
+    background-color: #111827;
+    color: #e5e7eb;
+    border-color: #1f2937;
+  }
+  body.theme-dark .text-dark,
+  body.theme-dark .breadcrumb-item.text-dark,
+  body.theme-dark .breadcrumb-item.text-dark.active {
+    color: #e5e7eb !important;
+  }
+  body.theme-dark .form-control {
+    background-color: #0f172a;
+    color: #e5e7eb;
+    border-color: #334155;
+  }
+  body.theme-dark .form-control::placeholder {
+    color: #94a3b8;
+  }
+  body.theme-dark hr {
+    border-color: rgba(148, 163, 184, 0.35);
+  }
+
+  /* Prevent sidenav toggler overlapping breadcrumb (desktop sizes can still be < xl). */
+  @media (max-width: 2000px) {
+    #navbarBlur nav[aria-label="breadcrumb"],
+    #navbarBlur h6 {
+      padding-left: 3rem;
+    }
+  }
 </style>
 
 </head>
@@ -57,7 +96,7 @@
     <!--   Core JS Files   -->
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/plugins/smooth-scrollbar.min.js"></script>
+    <script src="{{ asset('assets/js/plugins/smooth-scrollbar.min.js') }}"></script>
     <script>
         var win = navigator.platform.indexOf('Win') > -1;
         if (win && document.querySelector('#sidenav-scrollbar')) {
@@ -69,7 +108,43 @@
 
     </script>
     <!-- Control Center for Soft Dashboard: parallax effects, scripts for the example pages etc -->
-    <script src="assets/js/soft-ui-dashboard.js"></script>
+    <script src="{{ asset('assets/js/soft-ui-dashboard.js') }}"></script>
+    <script>
+        (function () {
+            function preferredTheme() {
+                if (localStorage.getItem('theme')) return localStorage.getItem('theme');
+                return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+            }
+
+            function applyTheme(theme) {
+                document.body.classList.toggle('theme-dark', theme === 'dark');
+                localStorage.setItem('theme', theme);
+                var toggle = document.getElementById('theme-toggle');
+                if (toggle) toggle.checked = theme === 'dark';
+            }
+
+            window.__applyTheme = applyTheme;
+            window.__toggleTheme = function () {
+                var next = document.body.classList.contains('theme-dark') ? 'light' : 'dark';
+                applyTheme(next);
+            };
+
+            document.addEventListener('DOMContentLoaded', function () {
+                applyTheme(preferredTheme());
+            });
+
+            document.addEventListener('change', function (e) {
+                if (e.target && e.target.id === 'theme-toggle') {
+                    applyTheme(e.target.checked ? 'dark' : 'light');
+                }
+            });
+
+            // If Livewire swaps the navbar, re-sync the toggle state.
+            document.addEventListener('livewire:load', function () {
+                applyTheme(preferredTheme());
+            });
+        })();
+    </script>
     @livewireScripts
 </body>
 

@@ -10,7 +10,13 @@
          x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
         <main class="main-content">
             <div x-data="{ open: false }" class="container-fluid py-4">
-                <form x-data="{ showConfirmPopup: false }"  wire:submit.prevent="save" action="#" method="POST" role="form text-left">            
+                <form wire:submit.prevent="validateForm" action="#" method="POST" role="form text-left">
+                    @if($alertMessage)
+                        <div class="alert alert-{{ $alertType === 'success' ? 'success' : 'danger' }} alert-dismissible fade show" role="alert">
+                            {{ $alertMessage }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    @endif
                     <h5 class="mt-3">Company Details</h5>
                     <hr>
                     <div class="row">
@@ -202,7 +208,7 @@
                             <div class=" position-absolute top-50 start-50 translate-middle bg-white p-4 rounded shadow-lg w-100"
                                 style="max-width: 500px;">
                                 <h3 class="fs-4 fw-medium mb-4">Add Director</h3>
-                                <form @submit.prevent="addDirector">
+                                <div>
                                     <div class="mb-3">
                                         <label for="directorName" class="form-label">Name</label>
                                         <input type="text" class="form-control" id="directorName"
@@ -221,9 +227,9 @@
                                     <div class="mt-4 d-flex justify-content-end">
                                         <button type="button" class="btn btn-secondary me-2"
                                             @click="showForm = false">Cancel</button>
-                                        <button type="submit" class="btn btn-primary">Save</button>
+                                        <button type="button" class="btn btn-primary" @click="showForm = false">Save</button>
                                     </div>
-                                </form>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -234,16 +240,17 @@
                                 <label class="">Services Opted for</label>
                                 <livewire:searchable-dropdown />
                             </div>
-                            <div class="d-flex justify-content-end gap-3">
-                                <form wire:submit.prevent="import">
-                                <input type="file" id='fileName' value='Add Excel' name='fileName' class="btn bg-gradient-dark btn-md mt-4 mb w-4" wire:change='saveFile'  wire:model="file">
-                                <input class="btn btn-primary" type="submit" value="Import finalise">
-                                </form>
-                                <button type="submit" wire:click="validateForm" @click="showConfirmPopup = true"
-                                    class="btn bg-gradient-dark btn-md mt-4 mb-4">{{ 'Save Changes' }} </button>
-                            </div>
-                        </div>
-                    </div>
+	                            <div class="d-flex justify-content-end gap-3">
+	                                <div class="d-flex align-items-center gap-2 mt-4 mb-4">
+	                                    <input type="file" wire:model="file" class="form-control" style="max-width: 260px;">
+	                                    <button type="button" class="btn btn-primary" wire:click="import">Import finalise</button>
+	                                </div>
+	                                <button type="button" wire:click="validateForm" class="btn bg-gradient-dark btn-md mt-4 mb-4">
+	                                    {{ 'Save Changes' }}
+	                                </button>
+	                            </div>
+	                        </div>
+	                    </div>
                     @if($showConfirmPopup)
 
                         <div>
@@ -258,8 +265,8 @@
                                             <p>Are you sure you want to save these changes?</p>
                                         </div>
                                         <div class="modal-footer">
-                                            <button wire:click="$set('showConfirmPopup', false)" class="btn btn-secondary">Discard</button>
-                                            <button wire:click="save"  class="btn btn-primary">Save Changes</button>
+                                            <button type="button" wire:click="$set('showConfirmPopup', false)" class="btn btn-secondary">Discard</button>
+                                            <button type="button" wire:click="save" class="btn btn-primary">Save Changes</button>
                                         </div>
                                     </div>
                                 </div>

@@ -13,12 +13,15 @@ class Location extends Model
 
     protected $fillable = [
         'company_id',
-        'name',
-        'address',
-        'city',
-        'state',
-        'country',
-        'zip_code',
+        'location_name',
+        'location_code',
+        'location_address',
+        'location_city',
+        'location_state',
+        'location_pincode',
+        'location_country',
+        'location_phone',
+        'location_email',
     ];
 
     public function company()
@@ -40,19 +43,24 @@ class Location extends Model
     // Helper method to get full address
     public function getFullAddressAttribute()
     {
-        $address = $this->address;
-        if ($this->city) {
-            $address .= ', ' . $this->city;
+        $address = (string) $this->location_address;
+        if ($this->location_city) {
+            $address .= ', ' . $this->location_city;
         }
-        if ($this->state) {
-            $address .= ', ' . $this->state;
+        if ($this->location_state) {
+            $address .= ', ' . $this->location_state;
         }
-        if ($this->country) {
-            $address .= ', ' . $this->country;
+        if ($this->location_country) {
+            $address .= ', ' . $this->location_country;
         }
-        if ($this->zip_code) {
-            $address .= ' ' . $this->zip_code;
+        if ($this->location_pincode) {
+            $address .= ' ' . $this->location_pincode;
         }
         return $address;
     }
-} 
+
+    public function getNameAttribute(): string
+    {
+        return (string) $this->location_name;
+    }
+}

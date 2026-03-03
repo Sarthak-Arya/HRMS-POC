@@ -55,6 +55,15 @@
                 <input class="form-check-input mt-1 ms-auto" type="checkbox" id="navbarFixed"
                     onclick="navbarFixed(this)">
             </div>
+
+            <!-- Theme -->
+            <div class="mt-3">
+                <h6 class="mb-0">Theme</h6>
+                <p class="text-sm mb-1">Switch between light and dark mode.</p>
+            </div>
+            <div class="form-check form-switch ps-0">
+                <input class="form-check-input mt-1 ms-auto" type="checkbox" id="theme-toggle">
+            </div>
             <hr class="horizontal dark my-sm-4">
             <a class="btn bg-gradient-dark w-100" href="https://www.creative-tim.com/product/soft-ui-dashboard-laravel-livewire"
                 target="_blank">Free download</a>

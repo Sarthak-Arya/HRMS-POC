@@ -1,4 +1,13 @@
 <main class="main-content">
+    <div wire:loading class="position-fixed top-0 start-0 w-100 h-100"
+        style="background: rgba(255,255,255,0.6); z-index: 1055;">
+        <div class="position-absolute top-50 start-50 translate-middle">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+
     @if (session()->has('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             {{ session('success') }}
@@ -10,6 +19,17 @@
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             {{ session('error') }}
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    @if ($errors->any())
+        <div class="alert alert-danger" role="alert">
+            <div class="fw-bold mb-1">Please fix the following:</div>
+            <ul class="mb-0">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
         </div>
     @endif
     <div class="container-fluid py-4" x-data="{ showModal: false, showImportModal: false}">
@@ -151,6 +171,14 @@
         </div>
 
         <form wire:submit.prevent="save" x-data="{ scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); } }" @submit="scrollToTop()">
+            @if (isset($employeeId) && $employeeId)
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="text-sm text-muted">Editing employee</div>
+                    <a href="{{ route('employee-details', ['company_id' => $companyId, 'employee_id' => $employeeId]) }}" class="btn btn-sm btn-outline-dark">
+                        Back to view
+                    </a>
+                </div>
+            @endif
             <h5>Personal Details</h5>
             <hr>
             <div class="row">
@@ -196,6 +224,9 @@
                         <div>
                             <input wire:model="fatherName" class="form-control" type="text" placeholder="Father Name" id="father-name">
                         </div>
+                        <div>
+                            @error('fatherName') <span class="error">{{ $message }}</span> @enderror
+                        </div>
                     </div>
                 </div>
                 <div class="col-md-4">
@@ -203,10 +234,14 @@
                         <label for="gender" class="form-control-label">Gender</label>
                         <div>
                             <select wire:model="gender" class="form-control" id="gender">
+                                <option value="" disabled>Select Gender</option>
                                 <option value="male">Male</option>
                                 <option value="female">Female</option>
                                 <option value="other">Other</option>
                             </select>
+                        </div>
+                        <div>
+                            @error('gender') <span class="error">{{ $message }}</span> @enderror
                         </div>
                     </div>
                 </div>
@@ -234,7 +269,25 @@
                     <div class="form-group">
                         <label for="designation" class="form-control-label">Designation</label>
                         <div>
-                            <input wire:model="designation" class="form-control" type="text" placeholder="Designation" id="designation">
+                            <input
+                                wire:model="designation"
+                                class="form-control"
+                                type="text"
+                                placeholder="Designation"
+                                id="designation"
+                                list="designation-options"
+                                autocomplete="off"
+                            >
+                            <datalist id="designation-options">
+                                @if (isset($designationOptions) && count($designationOptions) != 0)
+                                    @foreach ($designationOptions as $option)
+                                        <option value="{{ $option }}"></option>
+                                    @endforeach
+                                @endif
+                            </datalist>
+                        </div>
+                        <div>
+                            @error('designation') <span class="error">{{ $message }}</span> @enderror
                         </div>
                     </div>
                 </div>
@@ -242,15 +295,25 @@
                     <div class="form-group">
                         <label for="department" class="form-control-label">Department</label>
                         <div>
-                            <select wire:model="department" class="form-control" id="department" data-live-search="true">
-                                @if (count($departments) !=  0)
-                                    @foreach ($departments as $department)  
-                                    <option value="{{$department->id}}">{{$department->department_name}}</option>
+                            <input
+                                wire:model="department"
+                                class="form-control"
+                                type="text"
+                                placeholder="Department"
+                                id="department"
+                                list="department-options"
+                                autocomplete="off"
+                            >
+                            <datalist id="department-options">
+                                @if (isset($departmentOptions) && count($departmentOptions) != 0)
+                                    @foreach ($departmentOptions as $option)
+                                        <option value="{{ $option }}"></option>
                                     @endforeach
-                                @else
-                                    <option value="" default>None</option>
                                 @endif
-                            </select>
+                            </datalist>
+                        </div>
+                        <div>
+                            @error('department') <span class="error">{{ $message }}</span> @enderror
                         </div>
                     </div>
                 </div>
@@ -258,16 +321,25 @@
                     <div class="form-group">
                         <label for="location" class="form-control-label">Location</label>
                         <div>
-                            <select wire:model="location" class="form-control" id="location" data-live-search="true">
-                                <option value="">Select Location</option>
-                                @if (count($locations) !=  0)
-                                    @foreach ($locations as $location)  
-                                    <option value="{{$location->id}}">{{$location->name}}</option>
+                            <input
+                                wire:model="location"
+                                class="form-control"
+                                type="text"
+                                placeholder="Location"
+                                id="location"
+                                list="location-options"
+                                autocomplete="off"
+                            >
+                            <datalist id="location-options">
+                                @if (isset($locationOptions) && count($locationOptions) != 0)
+                                    @foreach ($locationOptions as $option)
+                                        <option value="{{ $option }}"></option>
                                     @endforeach
-                                @else
-                                    <option value="" default>None</option>
                                 @endif
-                            </select>
+                            </datalist>
+                        </div>
+                        <div>
+                            @error('location') <span class="error">{{ $message }}</span> @enderror
                         </div>
                     </div>
                 </div>
@@ -278,6 +350,9 @@
                         <label for="employee-company-code" class="form-control-label">Employee Company Code</label>
                         <div>
                             <input wire:model="employeeCompanyCode" class="form-control" type="text" placeholder="Employee Company Code" id="employee-company-code">
+                        </div>
+                        <div>
+                            @error('employeeCompanyCode') <span class="error">{{ $message }}</span> @enderror
                         </div>
                     </div>
                 </div>
@@ -350,7 +425,10 @@
             
 
             <div class="d-flex justify-content-end">
-                <button type="submit" class="btn bg-gradient-dark btn-md mt-4 mb-4">{{ 'Save Changes' }}</button>
+                <button type="button" wire:click="save" wire:loading.attr="disabled"
+                    class="btn bg-gradient-dark btn-md mt-4 mb-4">
+                    {{ 'Save Changes' }}
+                </button>
             </div>
         </form>
     </div>

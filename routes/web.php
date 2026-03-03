@@ -69,10 +69,12 @@ Route::middleware('auth')->group(function () {
         Route::middleware(CompanyAccessMiddleware::class)->group(function () {
             Route::get('/add-employee-details', action: AddEmployeeDetails::class)->name('add-employee-details');
             Route::post('/add-employee-details', action: AddEmployeeDetails::class)->name('add-employee-details');
+            Route::get('/edit-employee-details/{employee_id}', action: AddEmployeeDetails::class)->name('edit-employee-details');
             Route::get('/dashboard', action: Dashboard::class)->name('dashboard');
             Route::get('/compensation-structures', action: CompensationStructureManager::class)->name('compensation-structures');
             Route::get('/salary-generator', action: SalaryGenerator::class)->name('salary-generator');
             Route::get('/view-employee-details', action: EmployeeList::class)->name('view-employee-details');
+            Route::get('/view-employee-details/{employee_id}', action: ViewEmployeeDetails::class)->name('employee-details');
             Route::get('/attendance-entry', AttendanceEntry::class)->name('attendance-entry');
         });
         
@@ -83,4 +85,3 @@ Route::middleware('auth')->group(function () {
     Route::get('/static-sign-up', action: StaticSignUp::class)->name('static-sign-up');
     Route::get('/rtl', Rtl::class)->name('rtl');
 });
-

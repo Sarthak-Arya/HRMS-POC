@@ -10,14 +10,14 @@
                         <div class="form-group">
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                <input type="text" wire:model.live="search" class="form-control" placeholder="Search by name...">
+                                <input type="text" wire:model.debounce.300ms="search" class="form-control" placeholder="Search by name/code...">
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="form-group">
                             <label class="form-control-label">Filter by Designation</label>
-                            <select wire:model.live="selectedDesignation" class="form-control">
+                            <select wire:model="selectedDesignation" class="form-control">
                                 <option value="">All Designations</option>
                                 @foreach($designations as $designation)
                                     <option value="{{ $designation->id }}">{{ $designation->designation_name }}</option>
@@ -28,7 +28,7 @@
                     <div class="col-md-3">
                         <div class="form-group">
                             <label class="form-control-label">Filter by Department</label>
-                            <select wire:model.live="selectedDepartment" class="form-control">
+                            <select wire:model="selectedDepartment" class="form-control">
                                 <option value="">All Departments</option>
                                 @foreach($departments as $department)
                                     <option value="{{ $department->id }}">{{ $department->department_name }}</option>
@@ -39,7 +39,7 @@
                     <div class="col-md-3">
                         <div class="form-group">
                             <label class="form-control-label">Filter by Location</label>
-                            <select wire:model.live="selectedLocation" class="form-control">
+                            <select wire:model="selectedLocation" class="form-control">
                                 <option value="">All Locations</option>
                                 @foreach($locations as $location)
                                     <option value="{{ $location->id }}">{{ $location->name }}</option>
@@ -50,7 +50,7 @@
                     <div class="col-md-3">
                         <div class="form-group">
                             <label class="form-control-label">Filter by Status</label>
-                            <select wire:model.live="selectedStatus" class="form-control">
+                            <select wire:model="selectedStatus" class="form-control">
                                 <option value="">All Status</option>
                                 <option value="active">Active</option>
                                 <option value="inactive">Inactive</option>
@@ -66,8 +66,8 @@
             @if($employees->count() > 0)
                 <table class="table align-items-center mb-0">
                     <thead>
-                        <tr>
-                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Employee ID</th>
+                            <tr>
+                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Employee Code</th>
                             <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Full Name</th>
                             <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Designation</th>
                             <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Department</th>
@@ -83,14 +83,14 @@
                                 <td>
                                     <div class="d-flex px-2 py-1">
                                         <div class="d-flex flex-column justify-content-center">
-                                            <h6 class="mb-0 text-sm">{{ $employee->id }}</h6>
+                                            <h6 class="mb-0 text-sm">{{ $employee->employee_code }}</h6>
                                         </div>
                                     </div>
                                 </td>
                                 <td>
                                     <div class="d-flex px-2 py-1">
                                         <div class="d-flex flex-column justify-content-center">
-                                            <h6 class="mb-0 text-sm">{{ $employee->first_name }} {{ $employee->middle_name }} {{ $employee->last_name }}</h6>
+                                            <h6 class="mb-0 text-sm">{{ $employee->employee_name }}</h6>
                                         </div>
                                     </div>
                                 </td>
@@ -104,21 +104,23 @@
                                     <p class="text-xs font-weight-bold mb-0">{{ $employee->location->name ?? 'N/A' }}</p>
                                 </td>
                                 <td>
-                                    <p class="text-xs font-weight-bold mb-0">{{ $employee->joining_date->format('d/m/Y') }}</p>
+                                    <p class="text-xs font-weight-bold mb-0">{{ optional($employee->doj)->format('d/m/Y') ?? 'N/A' }}</p>
                                 </td>
                                 <td>
-                                    <span class="badge badge-sm {{ $employee->leaving_date ? 'bg-gradient-danger' : 'bg-gradient-success' }}">
-                                        {{ $employee->leaving_date ? 'Inactive' : 'Active' }}
+                                    <span class="badge badge-sm {{ $employee->dol ? 'bg-gradient-danger' : 'bg-gradient-success' }}">
+                                        {{ $employee->dol ? 'Inactive' : 'Active' }}
                                     </span>
                                 </td>
                                 <td class="align-middle">
-                                    <a href=""   class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="View employee">
+                                    <a href="{{ route('employee-details', ['company_id' => $companyId, 'employee_id' => $employee->id]) }}"
+                                        class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="View employee">
                                         <i class="fas fa-eye text-info me-2"></i>
                                     </a>
                                     {{-- <a href="{{ route('view-employee-details', ['employee_id' => $employee->id]) }}" class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="View employee">
                                         <i class="fas fa-eye text-info me-2"></i>
                                     </a> --}}
-                                    <a href="" class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Edit employee">
+                                    <a href="{{ route('edit-employee-details', ['company_id' => $companyId, 'employee_id' => $employee->id]) }}"
+                                        class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Edit employee">
                                         <i class="fas fa-edit text-warning"></i>
                                     </a>
                                 </td>

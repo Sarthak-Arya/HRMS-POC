@@ -70,6 +70,11 @@
                         @if($isEditMode)
                             <button type="button" class="btn btn-success" wire:click="save">Save Attendance</button>
                             <button type="button" class="btn btn-secondary" wire:click="toggleEditMode">Cancel</button>
+                            <div class="d-inline-flex align-items-center ms-3">
+                                <span class="me-2 text-sm">DED fields:</span>
+                                <button type="button" class="btn btn-sm btn-outline-dark me-1" wire:click="removeDeductionColumn">-</button>
+                                <button type="button" class="btn btn-sm btn-outline-dark" wire:click="addDeductionColumn">+</button>
+                            </div>
                         @endif
                         @if(session()->has('message'))
                             <div class="alert alert-success mt-2">{{ session('message') }}</div>
@@ -79,61 +84,43 @@
                 <table class="table align-items-center mb-0 mt-4">
                     <thead>
                         <tr>
-                            <th>Employee</th>
-                            <th>Department</th>
-                            <th>Designation</th>
-                            <th>Total Working Days</th>
-                            <th>Present</th>
-                            <th>Half Day</th>
-                            <th>Late</th>
-                            <th>Total Hours</th>
-                            <th>Overtime</th>
-                            <th>Total Leave</th>
-                            @foreach($leaveTypes as $leaveType)
-                                <th>{{ $leaveType->leave_code }}</th>
-                            @endforeach
-                            <th>Holidays</th>
-                            <th>Remarks</th>
+                            <th>EMPNO &amp; Employee Name</th>
+                            <th>CL</th>
+                            <th>EL</th>
+                            <th>SL</th>
+                            <th>ESI_LEAVE</th>
+                            <th>HOLIDAY</th>
+                            <th>TOT_DYS</th>
+                            @for ($i = 1; $i <= $deductionCount; $i++)
+                                <th>DED_{{ $i }}</th>
+                            @endfor
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($employees as $employee)
                         <tr>
-                            <td>{{ $employee->first_name }} {{ $employee->middle_name ?? '' }} {{ $employee->last_name }}</td>
-                            <td>{{ $employee->department->department_name ?? 'N/A' }}</td>
-                            <td>{{ $employee->designation->designation_name ?? 'N/A' }}</td>
                             <td>
-                                <input type="number" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.total_working_days" @if(!$isEditMode) readonly @endif>
+                                <div class="d-flex flex-column">
+                                    <span>{{ $employee->employee_code }} - {{ $employee->employee_name }}</span>
+                                    <small class="text-muted">
+                                        {{ $employee->department->department_name ?? 'N/A' }} /
+                                        {{ $employee->designation->designation_name ?? 'N/A' }}
+                                    </small>
+                                </div>
                             </td>
-                            <td>
-                                <input type="number" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.days_present" @if(!$isEditMode) readonly @endif>
-                            </td>
-                            <td>
-                                <input type="number" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.days_half_day" @if(!$isEditMode) readonly @endif>
-                            </td>
-                            <td>
-                                <input type="number" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.days_late" @if(!$isEditMode) readonly @endif>
-                            </td>
-                            <td>
-                                <input type="number" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.total_hours_worked" @if(!$isEditMode) readonly @endif>
-                            </td>
-                            <td>
-                                <input type="number" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.overtime_hours" @if(!$isEditMode) readonly @endif>
-                            </td>
-                            <td>
-                                <input type="number" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.total_leave_days" @if(!$isEditMode) readonly @endif>
-                            </td>
-                            @foreach($leaveTypes as $leaveType)
+                            <td><input type="number" step="0.5" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.cl" @if(!$isEditMode) readonly @endif></td>
+                            <td><input type="number" step="0.5" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.el" @if(!$isEditMode) readonly @endif></td>
+                            <td><input type="number" step="0.5" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.sl" @if(!$isEditMode) readonly @endif></td>
+                            <td><input type="number" step="0.5" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.esi_leave" @if(!$isEditMode) readonly @endif></td>
+                            <td><input type="number" step="0.5" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.holiday" @if(!$isEditMode) readonly @endif></td>
+                            <td><input type="number" step="0.5" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.tot_dys" @if(!$isEditMode) readonly @endif></td>
+                            @for ($i = 0; $i < $deductionCount; $i++)
                                 <td>
-                                    <input type="number" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.leave_taken.{{ strtolower($leaveType->leave_code) }}" @if(!$isEditMode) readonly @endif>
+                                    <input type="number" step="0.01" class="form-control form-control-sm"
+                                        wire:model="attendanceData.{{ $employee->id }}.deductions.{{ $i }}"
+                                        @if(!$isEditMode) readonly @endif>
                                 </td>
-                            @endforeach
-                            <td>
-                                <input type="number" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.holiday_days" @if(!$isEditMode) readonly @endif>
-                            </td>
-                            <td>
-                                <input type="text" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.remarks" @if(!$isEditMode) readonly @endif>
-                            </td>
+                            @endfor
                         </tr>
                         @endforeach
                     </tbody>

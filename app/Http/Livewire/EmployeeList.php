@@ -22,15 +22,18 @@ class EmployeeList extends Component
     public $search = '';
     public $selectedLocation = '';
 
-    public function mount()
+    public function mount(?string $company_id = null)
     {
-        $this->companyId = session()->get("companyId");
+        $this->companyId = $company_id ?? session()->get("companyId");
+        if ($this->companyId) {
+            session()->put('companyId', $this->companyId);
+        }
     }
 
     public function render()
     {
         $query = Employee::where('company_id', $this->companyId)
-            ->with(['designation', 'department']);
+            ->with(['designation', 'department', 'location']);
 
         if ($this->selectedDesignation) {
             $query->where('designation_id', $this->selectedDesignation);
@@ -46,16 +49,16 @@ class EmployeeList extends Component
 
         if ($this->selectedStatus !== '') {
             if ($this->selectedStatus === 'active') {
-                $query->whereNull('leaving_date');
+                $query->whereNull('dol');
             } else {
-                $query->whereNotNull('leaving_date');
+                $query->whereNotNull('dol');
             }
         }
 
         if ($this->search) {
             $query->where(function($q) {
-                $q->where('first_name', 'like', '%' . $this->search . '%')
-                  ->orWhere('last_name', 'like', '%' . $this->search . '%');
+                $q->where('employee_name', 'like', '%' . $this->search . '%')
+                  ->orWhere('employee_code', 'like', '%' . $this->search . '%');
             });
         }
 
@@ -68,7 +71,8 @@ class EmployeeList extends Component
             'employees' => $employees,
             'designations' => $designations,
             'departments' => $departments,
-            'locations' => $locations
+            'locations' => $locations,
+            'companyId' => $this->companyId,
         ]);
     }
 

@@ -7,46 +7,42 @@ use Illuminate\Database\QueryException;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use App\Http\Controllers\ImportExcel;
-use Livewire\Attributes\Validate;
 use Illuminate\Http\Request;
 use App\Models\Employee;
 use App\Models\Company;
 use App\Models\Department;
+use App\Models\Designation;
 use App\Models\Location;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
 use App\Exports\EmployeesExport;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\EmployeeImport;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class AddEmployeeDetails extends Component
 {
     use WithFileUploads;
     
     public string $companyId = '';
+    public ?int $employeeId = null;
 
     // New properties for form data with default values
-    #[Validate('required|min:2')]
     public string $firstName = '';
     
-    #[Validate('nullable')]
     public string $middleName = '';
     
-    #[Validate('required|min:2')]
     public string $lastName = '';
     
-    #[Validate('required|min:2')]
     public string $fatherName = '';
     
-    #[Validate('required')]
     public string $gender = '';
     
-    #[Validate('required|date')]
     public string $dob = '';
     
-    #[Validate('required')]
     public string $department = '';
     
-    #[Validate('required')]
     public string $designation = '';
     
     public string $location = '';
@@ -69,57 +65,212 @@ class AddEmployeeDetails extends Component
     public $importMessage = '';
     public $importError = '';
 
-    public function mount(?string $company_id = null)
+    protected function rules(): array
+    {
+        return [
+            'companyId' => ['required', 'integer', 'exists:company,id'],
+            'firstName' => ['required', 'string', 'min:2'],
+            'middleName' => ['nullable', 'string'],
+            'lastName' => ['required', 'string', 'min:2'],
+            'fatherName' => ['required', 'string', 'min:2'],
+            'gender' => ['required', 'in:male,female,other'],
+            'dob' => ['nullable', 'date'],
+            'department' => ['required', 'string', 'max:200'],
+            'designation' => ['required', 'string', 'max:200'],
+            'location' => ['required', 'string', 'max:255'],
+            'employeeCompanyCode' => [
+                'required',
+                'string',
+                'max:20',
+                Rule::unique('employees', 'employee_code')->ignore($this->employeeId),
+            ],
+            'joiningDate' => ['nullable', 'date'],
+            'leavingDate' => ['nullable', 'date', 'after_or_equal:joiningDate'],
+            'esiNo' => ['nullable', 'string', 'max:20'],
+            'pfNo' => ['nullable', 'string', 'max:20'],
+            'accountNo' => ['nullable', 'string', 'max:20'],
+            'bankName' => ['nullable', 'string', 'max:200'],
+            'ifscCode' => ['nullable', 'string', 'max:20'],
+        ];
+    }
+
+    public function mount(?string $company_id = null, ?string $employee_id = null)
     {
         $this->companyId = $company_id ?? request()->session()->get('companyId', '');
+        if ($this->companyId !== '') {
+            request()->session()->put('companyId', $this->companyId);
+        }
+
+        $this->employeeId = $employee_id !== null ? (int) $employee_id : null;
+        if ($this->employeeId) {
+            $employee = Employee::with(['department', 'designation', 'location'])
+                ->where('company_id', $this->companyId)
+                ->find($this->employeeId);
+
+            if ($employee) {
+                $nameParts = preg_split('/\\s+/', trim((string) $employee->employee_name)) ?: [];
+                $this->firstName = $nameParts[0] ?? '';
+                $this->lastName = count($nameParts) > 1 ? $nameParts[count($nameParts) - 1] : '';
+                if (count($nameParts) > 2) {
+                    $this->middleName = implode(' ', array_slice($nameParts, 1, -1));
+                }
+
+                $this->fatherName = (string) ($employee->father_name ?? '');
+                $this->gender = match ($employee->gender) {
+                    'M' => 'male',
+                    'F' => 'female',
+                    'O' => 'other',
+                    default => '',
+                };
+
+                $this->dob = $employee->dob ? $employee->dob->format('Y-m-d') : '';
+                $this->joiningDate = $employee->doj ? $employee->doj->format('Y-m-d') : '';
+                $this->leavingDate = $employee->dol ? $employee->dol->format('Y-m-d') : '';
+
+                $this->employeeCompanyCode = (string) $employee->employee_code;
+                $this->esiNo = (string) ($employee->esi_no ?? '');
+                $this->pfNo = (string) ($employee->pf_no ?? '');
+
+                $this->department = (string) ($employee->department->department_name ?? '');
+                $this->designation = (string) ($employee->designation->designation_name ?? '');
+                $this->location = (string) ($employee->location->location_name ?? $employee->location->name ?? '');
+
+                $this->bankName = (string) ($employee->bank_name ?? '');
+                $this->accountNo = (string) ($employee->bank_account_no ?? '');
+                $this->ifscCode = (string) ($employee->bank_ifsc_code ?? '');
+            }
+        }
     }
 
     public function render()
     {
-        $company = Company::with(['departments', 'locations'])->find(request()->session()->get('companyId'));
+        $company = Company::with(['departments', 'locations', 'designations'])->find($this->companyId);
         $departments = $company ? $company->departments : collect();
         $locations = $company ? $company->locations : collect();
+        $designations = $company ? $company->designations : collect();
 
         return view('livewire.add-employee-details', [
             "departments" => $departments,
-            "locations" => $locations
+            "locations" => $locations,
+            "designations" => $designations,
+            "departmentOptions" => $departments->pluck('department_name')->filter()->values()->all(),
+            "designationOptions" => $designations->pluck('designation_name')->filter()->values()->all(),
+            "locationOptions" => $locations->pluck('location_name')->filter()->values()->all(),
+            "companyId" => $this->companyId,
+            "employeeId" => $this->employeeId,
         ]);
     }
 
     public function save()
     {
-        // $validatedData = $this->validate();
         Log::debug("Saving employee data");
 
         try {
-            $employee = Employee::create([
-                'company_id' => request()->session()->get("companyId"),
-                'first_name' => $this->firstName,
-                'middle_name' => $this->middleName,
-                'last_name' => $this->lastName,
-                'father_name' => $this->fatherName,
-                'gender' => strtoupper(substr($this->gender, 0, 1)), // Convert to M/F/O format
-                'dob' => $this->dob,
-                'company_code' => $this->employeeCompanyCode,
-                'joining_date' => $this->joiningDate,
-                'leaving_date' => $this->leavingDate ?: null,
-                'esi_no' => $this->esiNo,
-                'pf_no' => $this->pfNo,
-                'designation_id' => $this->designation,
-                'department_id' => $this->department,
-                'location_id' => $this->location ?: null,
+            $this->validate();
+
+            $departmentName = trim($this->department);
+            $designationName = trim($this->designation);
+            $locationName = trim($this->location);
+
+            $department = Department::firstOrCreate([
+                'company_id' => (int) $this->companyId,
+                'department_name' => $departmentName,
             ]);
 
+            $designation = Designation::firstOrCreate([
+                'company_id' => (int) $this->companyId,
+                'designation_name' => $designationName,
+            ]);
+
+            $location = Location::query()
+                ->where('company_id', (int) $this->companyId)
+                ->whereRaw('LOWER(location_name) = ?', [Str::lower($locationName)])
+                ->first();
+
+            if (!$location) {
+                $base = preg_replace('/[^A-Z0-9]/', '', Str::upper($locationName));
+                $prefix = Str::substr($base ?: 'LOC', 0, 6);
+                $locationCode = $prefix . Str::upper(Str::random(4));
+
+                $location = Location::create([
+                    'company_id' => (int) $this->companyId,
+                    'location_name' => $locationName,
+                    'location_code' => $locationCode,
+                    'location_address' => '',
+                    'location_city' => '',
+                    'location_state' => '',
+                    'location_pincode' => '',
+                    'location_country' => '',
+                    'location_phone' => '',
+                    'location_email' => '',
+                ]);
+
+                Log::info('Created location on employee save', [
+                    'company_id' => $this->companyId,
+                    'location_id' => $location->id,
+                    'location_name' => $locationName,
+                ]);
+            }
+
+            $fullName = trim(implode(' ', array_filter([
+                $this->firstName,
+                $this->middleName,
+                $this->lastName,
+            ])));
+
+            $payload = [
+                'company_id' => (int) $this->companyId,
+                'employee_code' => $this->employeeCompanyCode,
+                'employee_name' => $fullName,
+                'father_name' => $this->fatherName,
+                'gender' => strtoupper(substr($this->gender, 0, 1)), // M/F/O
+                'dob' => $this->dob ?: null,
+                'doj' => $this->joiningDate ?: null,
+                'dol' => $this->leavingDate ?: null,
+                'esi_no' => $this->esiNo ?: null,
+                'pf_no' => $this->pfNo ?: null,
+                'department_id' => $department->id,
+                'designation_id' => $designation->id,
+                'location_id' => $location->id,
+                'bank_name' => $this->bankName ?: null,
+                'bank_account_no' => $this->accountNo ?: null,
+                'bank_ifsc_code' => $this->ifscCode ?: null,
+            ];
+
+            if ($this->employeeId) {
+                $employee = Employee::where('company_id', $this->companyId)->findOrFail($this->employeeId);
+                $employee->update($payload);
+                session()->flash('success', 'Employee details updated successfully!');
+                return redirect()->route('employee-details', ['company_id' => $this->companyId, 'employee_id' => $employee->id]);
+            }
+
+            $employee = Employee::create($payload);
             session()->flash('success', 'Employee details saved successfully!');
-            $this->reset();  // Clear the form after successful save
+            $this->resetExcept('companyId'); // Clear the form after successful save
         }
         catch(QueryException $e){
-            Log::debug("Error occurred in saving employee to database due to SQL Exception: " . $e->getMessage());
-            session()->flash('error', 'Failed to save employee details. Database error occurred.');
+            Log::error("Error occurred in saving employee to database due to SQL Exception: " . $e->getMessage(), [
+                'company_id' => $this->companyId,
+                'employee_code' => $this->employeeCompanyCode,
+            ]);
+            $message = config('app.debug')
+                ? ('Failed to save employee details: ' . $e->getMessage())
+                : 'Failed to save employee details. Database error occurred.';
+            session()->flash('error', $message);
         }  
+        catch (ValidationException $e) {
+            // Let Livewire handle validation errors and display them next to fields.
+            throw $e;
+        }
         catch(Exception $e){
-            Log::error("Error occurred in saving employee: " . $e->getMessage());
-            session()->flash('error', 'Failed to save employee details. Please try again.');
+            Log::error("Error occurred in saving employee: " . $e->getMessage(), [
+                'company_id' => $this->companyId,
+                'employee_code' => $this->employeeCompanyCode,
+            ]);
+            $message = config('app.debug')
+                ? ('Failed to save employee details: ' . $e->getMessage())
+                : 'Failed to save employee details. Please try again.';
+            session()->flash('error', $message);
         }
     }
 

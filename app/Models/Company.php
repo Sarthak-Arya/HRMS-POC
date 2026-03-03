@@ -19,7 +19,7 @@ class Company extends Model
         'company_name', 'gst_number', 'company_address', 'zip_code', 'state', 'country',
         'esi_code', 'esi_contribution', 'esi_coverage_end_date', 'esi_coverage_start_date',
         'pf_code', 'pf_coverage_start_date', 'pf_coverage_end_date', 'pf_contribution',
-        'services_opted', 'is_esi', 'is_pf'
+        'services_opted', 'is_esi', 'is_pf', 'company_handled_by'
     ];
 
     public function departments(){
