@@ -20,6 +20,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\EmployeeImport;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class AddEmployeeDetails extends Component
 {
@@ -92,6 +93,98 @@ class AddEmployeeDetails extends Component
             'bankName' => ['nullable', 'string', 'max:200'],
             'ifscCode' => ['nullable', 'string', 'max:20'],
         ];
+    }
+
+    private function normalizeHeadingCell(mixed $value): string
+    {
+        $text = trim((string) ($value ?? ''));
+        if ($text === '') {
+            return '';
+        }
+
+        $text = Str::lower($text);
+        $text = str_replace(['_', '-', '/', '\\', '.', ':', '(', ')', '[', ']', '{', '}', "\n", "\r", "\t"], ' ', $text);
+        $text = preg_replace('/\\s+/', ' ', $text) ?? $text;
+
+        return trim($text);
+    }
+
+    private function detectHeadingRow(string $filePath): int
+    {
+        $maxScanRows = 40;
+
+        $employeeCodeNeedles = [
+            'employee code',
+            'emp code',
+            'empno',
+            'emp no',
+            'employee no',
+        ];
+
+        $nameNeedles = [
+            'name',
+            'employee name',
+            'full name',
+        ];
+
+        try {
+            $spreadsheet = IOFactory::load($filePath);
+            $sheet = $spreadsheet->getSheet(0);
+            $highestColumn = $sheet->getHighestColumn();
+            $highestRow = min((int) $sheet->getHighestRow(), $maxScanRows);
+
+            for ($row = 1; $row <= $highestRow; $row++) {
+                $cells = $sheet->rangeToArray("A{$row}:{$highestColumn}{$row}", null, true, true, false);
+                $values = $cells[0] ?? [];
+
+                $normalized = [];
+                foreach ($values as $cellValue) {
+                    $n = $this->normalizeHeadingCell($cellValue);
+                    if ($n !== '') {
+                        $normalized[] = $n;
+                    }
+                }
+
+                if (empty($normalized)) {
+                    continue;
+                }
+
+                $rowText = ' ' . implode(' | ', $normalized) . ' ';
+
+                $hasEmployeeCode = false;
+                foreach ($employeeCodeNeedles as $needle) {
+                    if (str_contains($rowText, $needle)) {
+                        $hasEmployeeCode = true;
+                        break;
+                    }
+                }
+
+                $hasName = false;
+                foreach ($nameNeedles as $needle) {
+                    if (str_contains($rowText, $needle)) {
+                        $hasName = true;
+                        break;
+                    }
+                }
+
+                if ($hasEmployeeCode && $hasName) {
+                    return $row;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to auto-detect employee import heading row, falling back to row 1.', [
+                'company_id' => $this->companyId,
+                'file' => $filePath,
+                'error' => $e->getMessage(),
+            ]);
+        } finally {
+            if (isset($spreadsheet)) {
+                $spreadsheet->disconnectWorksheets();
+                unset($spreadsheet);
+            }
+        }
+
+        return 1;
     }
 
     public function mount(?string $company_id = null, ?string $employee_id = null)
@@ -278,66 +371,58 @@ class AddEmployeeDetails extends Component
      * Validate the Excel import input (file, department, and location)
      * Returns an array of issues (empty if valid)
      */
-    private function validateExcelImportInput()
-    {
-        $inputIssues = [];
-        if (empty($this->excelFile)) {
-            $inputIssues[] = 'Excel file is required.';
-        } elseif (!in_array($this->excelFile->getClientOriginalExtension(), ['xlsx', 'xls'])) {
-            $inputIssues[] = 'The file must be an Excel file (.xlsx or .xls).';
-        }
-        if (empty($this->importDepartment)) {
-            $inputIssues[] = 'Department is required for import.';
-        }
-        if (empty($this->importLocation)) {
-            $inputIssues[] = 'Location is required for import.';
-        }
-        return $inputIssues;
-    }
-
     public function importEmployees()
     {
-        // Validate input using the new function
-        $inputIssues = $this->validateExcelImportInput();
-        if (!empty($inputIssues)) {
-            $this->importError = implode("\n", $inputIssues);
-            return;
-        }
         try {
             $this->isImporting = true;
             $this->importMessage = '';
             $this->importError = '';
 
+            $this->validate([
+                'excelFile' => 'required|file|mimes:xlsx,xls,csv|max:5120',
+            ]);
+
             Log::info('Starting employee import', [
                 'user_id' => auth()->id(),
                 'company_id' => $this->companyId,
-                'department' => $this->importDepartment,
-                'location' => $this->importLocation,
                 'file_name' => $this->excelFile ? $this->excelFile->getClientOriginalName() : null
             ]);
 
-            $import = new EmployeeImport($this->importLocation, $this->importDepartment);
+            $headingRow = 1;
+            $realPath = $this->excelFile?->getRealPath();
+            if (is_string($realPath) && $realPath !== '' && file_exists($realPath)) {
+                $headingRow = $this->detectHeadingRow($realPath);
+            }
+
+            $import = new EmployeeImport((int) $this->companyId, (int) $headingRow);
             Excel::import($import, $this->excelFile);
 
             $errors = $import->getErrors();
+
+            $stats = method_exists($import, 'getImportStats') ? $import->getImportStats() : null;
+            if ($stats) {
+                $this->importMessage = "Imported {$stats['imported']} employees. Failed {$stats['failed']} rows. (Header row: {$headingRow})";
+            } else {
+                $this->importMessage = 'Employee import finished.';
+            }
+
             if (!empty($errors)) {
-                $this->importError = "Import failed. No data was imported. Errors:\n";
-                foreach ($errors as $error) {
-                    $this->importError .= "Row {$error['row']}, Column '{$error['field']}': {$error['message']}\n";
+                $this->importError = "Some rows were skipped/failed:\n";
+                foreach (array_slice($errors, 0, 50) as $error) {
+                    $this->importError .= "Row {$error['row']}: {$error['message']}\n";
                 }
-                Log::warning('Employee import failed, no data imported', [
+                if (count($errors) > 50) {
+                    $this->importError .= '...more errors not shown';
+                }
+                Log::warning('Employee import completed with errors', [
                     'user_id' => auth()->id(),
                     'company_id' => $this->companyId,
-                    'errors' => $errors
+                    'errors' => $errors,
                 ]);
-                $this->isImporting = false;
-                return;
             }
-            $import->processImport();
-            $this->importMessage = 'All employees imported successfully!';
-            $this->isImporting = false;
         } catch (\Exception $e) {
             $this->importError = 'Error importing data: ' . $e->getMessage();
+        } finally {
             $this->isImporting = false;
         }
     }

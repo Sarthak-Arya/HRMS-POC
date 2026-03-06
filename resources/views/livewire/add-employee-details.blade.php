@@ -123,35 +123,11 @@
                             @endif
                             <form wire:submit.prevent="importEmployees">
                                 <div class="form-group mb-3">
-                                    <label class="form-control-label">Department</label>
-                                    <select wire:model="importDepartment" class="form-control" required>
-                                        <option value="">Select Department</option>
-                                        <option value="all">All Departments</option>
-                                        @foreach($departments as $department)
-                                            <option value="{{ $department->id }}">{{ $department->department_name }}</option>
-                                        @endforeach
-                                    </select>
-                                    @if($importDepartment === 'all')
-                                        <small class="text-muted">If 'All Departments' is selected, your Excel must include a Department column.</small>
-                                    @endif
-                                </div>
-                                <div class="form-group mb-3">
-                                    <label class="form-control-label">Location</label>
-                                    <select wire:model="importLocation" class="form-control" required>
-                                        <option value="">Select Location</option>
-                                        <option value="all">All Locations</option>
-                                        @foreach($locations as $location)
-                                            <option value="{{ $location->id }}">{{ $location->name }}</option>
-                                        @endforeach
-                                    </select>
-                                    @if($importLocation === 'all')
-                                        <small class="text-muted">If 'All Locations' is selected, your Excel must include a Location column.</small>
-                                    @endif
-                                </div>
-                                <div class="form-group mb-3">
                                     <label class="form-control-label">Excel File</label>
-                                    <input type="file" wire:model="excelFile" class="form-control" accept=".xlsx,.xls" required>
-                                    <small class="text-muted">Supported formats: .xlsx, .xls</small>
+                                    <input type="file" wire:model="excelFile" class="form-control" accept=".xlsx,.xls,.csv" required>
+                                    <small class="text-muted">
+                                        Supported formats: .xlsx, .xls, .csv. Missing fields are auto-filled where possible (department/designation/location will be created if missing).
+                                    </small>
                                 </div>
                                 <div class="d-flex justify-content-end">
                                     <button type="button" class="btn btn-secondary me-2" @click="showImportModal = false">Cancel</button>

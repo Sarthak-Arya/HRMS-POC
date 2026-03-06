@@ -79,13 +79,19 @@
   }
 
   /* Prevent sidenav toggler overlapping breadcrumb (desktop sizes can still be < xl). */
-  @media (max-width: 2000px) {
-    #navbarBlur nav[aria-label="breadcrumb"],
-    #navbarBlur h6 {
-      padding-left: 3rem;
-    }
-  }
-</style>
+	  @media (max-width: 2000px) {
+	    #navbarBlur nav[aria-label="breadcrumb"],
+	    #navbarBlur h6 {
+	      padding-left: 3rem;
+	    }
+	  }
+
+	  /* Sidebar: reduce left/right gutter so items align closer to the edge */
+	  .navbar-vertical.navbar-expand-xs .navbar-nav .nav-link {
+	    margin-left: -0.99rem;
+	    margin-right: 0.15rem;
+	  }
+	</style>
 
 </head>
 
