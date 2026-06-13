@@ -2,12 +2,8 @@
 
 namespace App\Imports;
 
-use App\Models\Department;
-use App\Models\Designation;
 use App\Models\Employee;
-use App\Models\Location;
-use Carbon\Carbon;
-use Illuminate\Database\QueryException;
+use App\Services\Employee\EmployeeService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -15,50 +11,85 @@ use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Imports\HeadingRowFormatter;
-use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
+/**
+ * Excel import class for employees.
+ * Handles reading employee data from Excel collections and upserting into the database.
+ */
 class EmployeeImport implements ToCollection, WithHeadingRow, WithChunkReading
 {
+    /** @var int Current row number being processed */
     private int $rowNumber = 0;
+
+    /** @var int Number of employees successfully imported */
     private int $importedCount = 0;
+
+    /** @var int Number of rows that failed to import */
     private int $failedCount = 0;
+
+    /** @var array<int, array<string, mixed>> List of errors encountered during import */
     private array $errors = [];
 
+    /** @var int The ID of the company to import employees for */
     private int $companyId;
+
+    /** @var int The row number that contains the headers */
     private int $headingRow;
 
-    /** @var array<string,int> */
-    private array $departmentCache = [];
-    /** @var array<string,int> */
-    private array $designationCache = [];
-    /** @var array<string,int> */
-    private array $locationCache = [];
+    /** @var EmployeeService Service for employee operations */
+    private EmployeeService $employeeService;
 
-    public function __construct(int $companyId, int $headingRow = 1)
+    /**
+     * Create a new import instance.
+     *
+     * @param int $companyId The ID of the company.
+     * @param int $headingRow The row number for headers.
+     * @param EmployeeService|null $employeeService Optional service instance.
+     */
+    public function __construct(int $companyId, int $headingRow = 1, ?EmployeeService $employeeService = null)
     {
-        // Use normalized headings (snake_case) for robustness.
         HeadingRowFormatter::default('slug');
         $this->companyId = $companyId;
         $this->headingRow = $headingRow;
-        // Make error row numbers match the source sheet (first data row is headingRow + 1).
         $this->rowNumber = $headingRow;
+        $this->employeeService = $employeeService ?? app(EmployeeService::class);
     }
 
+    /**
+     * Specify the heading row number.
+     *
+     * @return int
+     */
     public function headingRow(): int
     {
         return $this->headingRow;
     }
 
+    /**
+     * Specify the chunk size for reading the Excel file.
+     *
+     * @return int
+     */
     public function chunkSize(): int
     {
         return 200;
     }
 
+    /**
+     * Get the errors encountered during import.
+     *
+     * @return array<int, array<string, mixed>>
+     */
     public function getErrors(): array
     {
         return $this->errors;
     }
 
+    /**
+     * Get stats about the import process.
+     *
+     * @return array{imported: int, failed: int, total_processed: int}
+     */
     public function getImportStats(): array
     {
         return [
@@ -68,13 +99,18 @@ class EmployeeImport implements ToCollection, WithHeadingRow, WithChunkReading
         ];
     }
 
+    /**
+     * Process a collection of rows from the Excel file.
+     *
+     * @param Collection $rows The collection of rows.
+     * @return void
+     */
     public function collection(Collection $rows): void
     {
         foreach ($rows as $row) {
             $this->rowNumber++;
             $data = $this->normalizeRow($row->toArray());
 
-            // Skip fully empty rows.
             $hasAnyValue = false;
             foreach ($data as $value) {
                 if ($value !== null && trim((string) $value) !== '') {
@@ -87,11 +123,22 @@ class EmployeeImport implements ToCollection, WithHeadingRow, WithChunkReading
             }
 
             try {
-                $ok = $this->insertEmployee($data);
-                if ($ok) {
+                $employeeCode = trim((string) ($data['employee_code'] ?? ''));
+                $existing = $employeeCode !== ''
+                    ? Employee::where('employee_code', $employeeCode)->first()
+                    : null;
+
+                $result = $this->employeeService->upsertFromImportRow($this->companyId, $data, $existing);
+
+                if ($result['success']) {
                     $this->importedCount++;
                 } else {
                     $this->failedCount++;
+                    $this->addError(
+                        $this->rowNumber,
+                        $result['field'] ?? 'import',
+                        $result['error'] ?? 'Import failed.'
+                    );
                 }
             } catch (\Throwable $e) {
                 $this->failedCount++;
@@ -105,6 +152,14 @@ class EmployeeImport implements ToCollection, WithHeadingRow, WithChunkReading
         }
     }
 
+    /**
+     * Add an error to the error list.
+     *
+     * @param int $rowNumber The row number where error occurred.
+     * @param string $field The field that caused the error.
+     * @param string $message The error message.
+     * @return void
+     */
     private function addError(int $rowNumber, string $field, string $message): void
     {
         $this->errors[] = [
@@ -115,15 +170,13 @@ class EmployeeImport implements ToCollection, WithHeadingRow, WithChunkReading
     }
 
     /**
-     * Accept both the old template headings and more "free-form" headings.
+     * Normalize a row by mapping synonyms to target keys.
      *
-     * @param array<string,mixed> $row
-     * @return array<string,mixed>
+     * @param array<string,mixed> $row The raw row data.
+     * @return array<string,mixed> The normalized row data.
      */
     private function normalizeRow(array $row): array
     {
-        // If the sheet used the old provided template, keys may come through as
-        // e.g. "first_name", but also might be "first_name_" etc depending on the formatter.
         $mapped = [];
 
         $synonyms = [
@@ -156,247 +209,6 @@ class EmployeeImport implements ToCollection, WithHeadingRow, WithChunkReading
             }
         }
 
-        // Keep original for any direct access fallback.
         return array_merge($row, $mapped);
-    }
-
-    private function normalizeGender(mixed $value): string
-    {
-        $raw = Str::upper(trim((string) $value));
-        if ($raw === '') {
-            return 'O';
-        }
-        if (in_array($raw, ['M', 'MALE'], true)) return 'M';
-        if (in_array($raw, ['F', 'FEMALE'], true)) return 'F';
-        if (in_array($raw, ['O', 'OTHER'], true)) return 'O';
-        return 'O';
-    }
-
-    private function parseExcelDate(mixed $value): ?string
-    {
-        if ($value === null || trim((string) $value) === '') {
-            return null;
-        }
-        try {
-            if (is_numeric($value)) {
-                return Carbon::instance(ExcelDate::excelToDateTimeObject($value))->format('Y-m-d');
-            }
-            return Carbon::parse((string) $value)->format('Y-m-d');
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private function ensureDepartmentId(?string $name): int
-    {
-        $departmentName = trim((string) $name);
-        if ($departmentName === '') $departmentName = 'General';
-        $key = Str::lower($departmentName);
-
-        if (isset($this->departmentCache[$key])) {
-            return $this->departmentCache[$key];
-        }
-
-        $department = Department::firstOrCreate([
-            'company_id' => $this->companyId,
-            'department_name' => $departmentName,
-        ]);
-
-        return $this->departmentCache[$key] = $department->id;
-    }
-
-    private function ensureDesignationId(?string $name): int
-    {
-        $designationName = trim((string) $name);
-        if ($designationName === '') $designationName = 'Staff';
-        $key = Str::lower($designationName);
-
-        if (isset($this->designationCache[$key])) {
-            return $this->designationCache[$key];
-        }
-
-        $designation = Designation::firstOrCreate([
-            'company_id' => $this->companyId,
-            'designation_name' => $designationName,
-        ]);
-
-        return $this->designationCache[$key] = $designation->id;
-    }
-
-    private function ensureLocationId(?string $name): int
-    {
-        $locationName = trim((string) $name);
-        if ($locationName === '') $locationName = 'Default';
-        $key = Str::lower($locationName);
-
-        if (isset($this->locationCache[$key])) {
-            return $this->locationCache[$key];
-        }
-
-        $existing = Location::where('company_id', $this->companyId)
-            ->whereRaw('LOWER(location_name) = ?', [$key])
-            ->first();
-        if ($existing) {
-            return $this->locationCache[$key] = $existing->id;
-        }
-
-        $base = preg_replace('/[^A-Z0-9]/', '', Str::upper($locationName));
-        $prefix = Str::substr($base ?: 'LOC', 0, 6);
-        $locationCode = $prefix . Str::upper(Str::random(4));
-
-        $location = Location::create([
-            'company_id' => $this->companyId,
-            'location_name' => $locationName,
-            'location_code' => $locationCode,
-            'location_address' => '',
-            'location_city' => '',
-            'location_state' => '',
-            'location_pincode' => '',
-            'location_country' => '',
-            'location_phone' => '',
-            'location_email' => '',
-        ]);
-
-        return $this->locationCache[$key] = $location->id;
-    }
-
-    private function generateEmployeeCode(): string
-    {
-        // <= 20 chars
-        for ($i = 0; $i < 10; $i++) {
-            $candidate = 'EMP' . Str::upper(Str::random(10)); // 13 chars
-            if (!Employee::where('employee_code', $candidate)->exists()) {
-                return $candidate;
-            }
-        }
-        return 'EMP' . time();
-    }
-
-    private function isFilled(mixed $value): bool
-    {
-        return $value !== null && trim((string) $value) !== '';
-    }
-
-    /**
-     * @param array<string,mixed> $row
-     */
-    private function insertEmployee(array $row): bool
-    {
-        $employeeCode = trim((string) ($row['employee_code'] ?? ''));
-        if ($employeeCode === '') {
-            $employeeCode = $this->generateEmployeeCode();
-        }
-
-        $existingEmployee = Employee::where('employee_code', $employeeCode)->first();
-        if ($existingEmployee && (int) $existingEmployee->company_id !== (int) $this->companyId) {
-            $this->addError($this->rowNumber, 'employee_code', "Employee code '$employeeCode' belongs to a different company (skipped).");
-            return false;
-        }
-
-        $employeeName = trim((string) ($row['employee_name'] ?? ''));
-        if ($employeeName === '') {
-            $parts = array_filter([
-                trim((string) ($row['first_name'] ?? '')),
-                trim((string) ($row['middle_name'] ?? '')),
-                trim((string) ($row['last_name'] ?? '')),
-            ]);
-            $employeeName = trim(implode(' ', $parts));
-        }
-        if ($employeeName === '') {
-            $employeeName = 'Employee ' . $employeeCode;
-        }
-
-        $departmentId = $this->isFilled($row['department'] ?? null)
-            ? $this->ensureDepartmentId($row['department'] ?? null)
-            : (int) ($existingEmployee?->department_id ?? $this->ensureDepartmentId(null));
-
-        $designationId = $this->isFilled($row['designation'] ?? null)
-            ? $this->ensureDesignationId($row['designation'] ?? null)
-            : (int) ($existingEmployee?->designation_id ?? $this->ensureDesignationId(null));
-
-        $locationId = $this->isFilled($row['location'] ?? null)
-            ? $this->ensureLocationId($row['location'] ?? null)
-            : (int) ($existingEmployee?->location_id ?? $this->ensureLocationId(null));
-
-        $gender = $existingEmployee ? ($existingEmployee->gender ?? 'O') : 'O';
-        if ($this->isFilled($row['gender'] ?? null)) {
-            $gender = $this->normalizeGender($row['gender'] ?? null);
-        }
-
-        $dob = $existingEmployee?->dob;
-        if ($this->isFilled($row['dob'] ?? null)) {
-            $dob = $this->parseExcelDate($row['dob'] ?? null);
-        }
-        $doj = $existingEmployee?->doj;
-        if ($this->isFilled($row['doj'] ?? null)) {
-            $doj = $this->parseExcelDate($row['doj'] ?? null);
-        }
-        $dol = $existingEmployee?->dol;
-        if ($this->isFilled($row['dol'] ?? null)) {
-            $dol = $this->parseExcelDate($row['dol'] ?? null);
-        }
-
-        $payload = [
-            'company_id' => $this->companyId,
-            'employee_code' => $employeeCode,
-            'employee_name' => $employeeName ?: ($existingEmployee?->employee_name ?? ('Employee ' . $employeeCode)),
-            'father_name' => $this->isFilled($row['father_name'] ?? null)
-                ? (trim((string) ($row['father_name'] ?? '')) ?: null)
-                : ($existingEmployee?->father_name),
-            'gender' => $gender,
-            'dob' => $dob,
-            'doj' => $doj,
-            'dol' => $dol,
-            'pf_no' => $this->isFilled($row['pf_no'] ?? null)
-                ? (trim((string) ($row['pf_no'] ?? '')) ?: null)
-                : ($existingEmployee?->pf_no),
-            'esi_no' => $this->isFilled($row['esi_no'] ?? null)
-                ? (trim((string) ($row['esi_no'] ?? '')) ?: null)
-                : ($existingEmployee?->esi_no),
-            'department_id' => $departmentId,
-            'designation_id' => $designationId,
-            'location_id' => $locationId,
-            'bank_name' => $this->isFilled($row['bank_name'] ?? null)
-                ? (trim((string) ($row['bank_name'] ?? '')) ?: null)
-                : ($existingEmployee?->bank_name),
-            'bank_account_no' => $this->isFilled($row['bank_account_no'] ?? null)
-                ? (trim((string) ($row['bank_account_no'] ?? '')) ?: null)
-                : ($existingEmployee?->bank_account_no),
-            'bank_ifsc_code' => $this->isFilled($row['bank_ifsc_code'] ?? null)
-                ? (trim((string) ($row['bank_ifsc_code'] ?? '')) ?: null)
-                : ($existingEmployee?->bank_ifsc_code),
-        ];
-
-        try {
-            if ($existingEmployee) {
-                $existingEmployee->update($payload);
-            } else {
-                Employee::create($payload);
-            }
-            return true;
-        } catch (QueryException $e) {
-            // Keep import going; record a user-friendly message.
-            $sqlState = $e->getCode();
-            $errorCode = isset($e->errorInfo[1]) ? $e->errorInfo[1] : null;
-            $message = 'Database error while importing employee.';
-
-            if ($sqlState === '23000' && $errorCode == 1062) {
-                $message = "Duplicate employee code '$employeeCode'.";
-            } elseif ($sqlState === '23000' && $errorCode == 1452) {
-                $message = 'Invalid department/designation/location reference.';
-            }
-
-            Log::error('Employee import SQL error', [
-                'row' => $this->rowNumber,
-                'company_id' => $this->companyId,
-                'sqlstate' => $sqlState,
-                'error_code' => $errorCode,
-                'exception_message' => $e->getMessage(),
-                'employee_code' => $employeeCode,
-            ]);
-
-            $this->addError($this->rowNumber, 'database', $message);
-            return false;
-        }
     }
 }

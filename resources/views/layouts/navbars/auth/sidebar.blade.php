@@ -148,8 +148,8 @@
                 <h6 class="ps-4 ms-2 text-uppercase text-xs font-weight-bolder opacity-6">Salary Operations</h6>
             </li>
             <li class="nav-item">
-                <a class="nav-link {{ Route::currentRouteName() == 'compensation-structures' ? 'active' : '' }}"
-                    href="{{ route('compensation-structures', ['company_id' => request()->session()->get('companyId')]) }}">
+                <a class="nav-link {{ in_array(Route::currentRouteName(), ['compensation', 'compensation-structures']) ? 'active' : '' }}"
+                    href="{{ route('compensation', ['company_id' => request()->session()->get('companyId')]) }}">
                     <div
                         class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
                         <svg width="12px" height="12px" viewBox="0 0 46 42" version="1.1"
@@ -175,7 +175,7 @@
                             </g>
                         </svg>
                     </div>
-                    <span class="nav-link-text ms-1">Compensation Structures</span>
+                    <span class="nav-link-text ms-1">Compensation</span>
                 </a>
             </li>
             <li class="nav-item">

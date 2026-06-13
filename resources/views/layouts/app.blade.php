@@ -43,6 +43,12 @@
                     </div>
                 </div>
             </main>
+            @php
+                $widgetCompanyId = request()->route('company_id') ?? session('companyId');
+            @endphp
+            @if($widgetCompanyId)
+                @livewire('ai-assistant-widget', ['company_id' => $widgetCompanyId], key('ai-widget-' . $widgetCompanyId))
+            @endif
         @endif
     @endauth
 

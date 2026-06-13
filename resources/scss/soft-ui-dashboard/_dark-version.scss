@@ -83,7 +83,7 @@
   }
 
   .bg-gradient-dark {
-    background-image: linear-gradient(195deg, $dark-gradient-dark, $dark-gradient-state-dark);
+    background-image: linear-gradient($brand-gradient-angle, $dark-gradient-dark, $dark-gradient-state-dark);
   }
 
   .card,

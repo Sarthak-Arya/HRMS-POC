@@ -19,7 +19,8 @@ use App\Http\Livewire\AddEmployeeDetails;
 use App\Http\Livewire\ViewEmployeeDetails;
 use App\Http\Livewire\AddCompanyDetails;
 use App\Http\Livewire\ViewCompanies;
-use App\Http\Livewire\CompensationStructureManager;
+use App\Http\Livewire\CompensationHub;
+use App\Http\Livewire\EmployeeCompensation;
 use App\Http\Livewire\SalaryGenerator;
 
 use App\Http\Middleware\CompanyAccessMiddleware;
@@ -71,7 +72,11 @@ Route::middleware('auth')->group(function () {
             Route::post('/add-employee-details', action: AddEmployeeDetails::class)->name('add-employee-details');
             Route::get('/edit-employee-details/{employee_id}', action: AddEmployeeDetails::class)->name('edit-employee-details');
             Route::get('/dashboard', action: Dashboard::class)->name('dashboard');
-            Route::get('/compensation-structures', action: CompensationStructureManager::class)->name('compensation-structures');
+            Route::get('/compensation', action: CompensationHub::class)->name('compensation');
+            Route::get('/compensation-structures', function (string $company_id) {
+                return redirect()->route('compensation', ['company_id' => $company_id]);
+            })->name('compensation-structures');
+            Route::get('/employee-compensation/{employee_id}', action: EmployeeCompensation::class)->name('employee-compensation');
             Route::get('/salary-generator', action: SalaryGenerator::class)->name('salary-generator');
             Route::get('/view-employee-details', action: EmployeeList::class)->name('view-employee-details');
             Route::get('/view-employee-details/{employee_id}', action: ViewEmployeeDetails::class)->name('employee-details');

@@ -10,9 +10,7 @@ use App\Http\Controllers\ImportExcel;
 use Illuminate\Http\Request;
 use App\Models\Employee;
 use App\Models\Company;
-use App\Models\Department;
-use App\Models\Designation;
-use App\Models\Location;
+use App\Services\Employee\EmployeeService;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
 use App\Exports\EmployeesExport;
@@ -22,50 +20,100 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
+/**
+ * Livewire component for adding or editing employee details.
+ * Supports manual form entry and Excel import/export.
+ */
 class AddEmployeeDetails extends Component
 {
     use WithFileUploads;
     
+    /** @var string The ID of the company */
     public string $companyId = '';
+
+    /** @var int|null The ID of the employee if editing, null if creating */
     public ?int $employeeId = null;
 
-    // New properties for form data with default values
+    /** @var string Employee's first name */
     public string $firstName = '';
     
+    /** @var string Employee's middle name */
     public string $middleName = '';
     
+    /** @var string Employee's last name */
     public string $lastName = '';
     
+    /** @var string Employee's father's name */
     public string $fatherName = '';
     
+    /** @var string Employee's gender */
     public string $gender = '';
     
+    /** @var string Employee's date of birth */
     public string $dob = '';
     
+    /** @var string Employee's department name */
     public string $department = '';
     
+    /** @var string Employee's designation name */
     public string $designation = '';
     
+    /** @var string Employee's location name */
     public string $location = '';
     
+    /** @var string Company name (display only) */
     public string $companyName = '';
+
+    /** @var string Unique employee code assigned by the company */
     public string $employeeCompanyCode = '';
+
+    /** @var string Date of joining */
     public string $joiningDate = '';
+
+    /** @var string Date of leaving (null for active employees) */
     public string $leavingDate = '';
+
+    /** @var string ESI number */
     public string $esiNo = '';
+
+    /** @var string PF number */
     public string $pfNo = '';
+
+    /** @var string Bank account number */
     public string $accountNo = '';
+
+    /** @var string Bank name */
     public string $bankName = '';
+
+    /** @var string Bank IFSC code */
     public string $ifscCode = '';
 
+    /** @var string Currently selected department for filtering export */
     public $selectedDepartment = '';
+
+    /** @var \Livewire\TemporaryUploadedFile|null Uploaded Excel file */
     public $excelFile;
+
+    /** @var string Department for import (not used in current logic) */
     public $importDepartment = '';
+
+    /** @var string Location for import (not used in current logic) */
     public $importLocation = '';
+
+    /** @var bool Flag indicating if import is in progress */
     public $isImporting = false;
+
+    /** @var string Success message from import */
     public $importMessage = '';
+
+    /** @var string Error message(s) from import */
     public $importError = '';
 
+    /**
+     * Define validation rules for the form.
+     *
+     * @return array<string, mixed>
+     */
     protected function rules(): array
     {
         return [
@@ -89,12 +137,18 @@ class AddEmployeeDetails extends Component
             'leavingDate' => ['nullable', 'date', 'after_or_equal:joiningDate'],
             'esiNo' => ['nullable', 'string', 'max:20'],
             'pfNo' => ['nullable', 'string', 'max:20'],
-            'accountNo' => ['nullable', 'string', 'max:20'],
+            'account_no' => ['nullable', 'string', 'max:20'],
             'bankName' => ['nullable', 'string', 'max:200'],
             'ifscCode' => ['nullable', 'string', 'max:20'],
         ];
     }
 
+    /**
+     * Normalize a heading cell for auto-detection of Excel headers.
+     *
+     * @param mixed $value Raw cell value.
+     * @return string Normalized text.
+     */
     private function normalizeHeadingCell(mixed $value): string
     {
         $text = trim((string) ($value ?? ''));
@@ -109,6 +163,12 @@ class AddEmployeeDetails extends Component
         return trim($text);
     }
 
+    /**
+     * Auto-detect the heading row in an employee import file.
+     *
+     * @param string $filePath Path to the uploaded file.
+     * @return int Detected heading row number.
+     */
     private function detectHeadingRow(string $filePath): int
     {
         $maxScanRows = 40;
@@ -187,6 +247,13 @@ class AddEmployeeDetails extends Component
         return 1;
     }
 
+    /**
+     * Initialize the component.
+     *
+     * @param string|null $company_id The ID of the company.
+     * @param string|null $employee_id The ID of the employee for editing.
+     * @return void
+     */
     public function mount(?string $company_id = null, ?string $employee_id = null)
     {
         $this->companyId = $company_id ?? request()->session()->get('companyId', '');
@@ -235,6 +302,11 @@ class AddEmployeeDetails extends Component
         }
     }
 
+    /**
+     * Render the component view.
+     *
+     * @return \Illuminate\View\View
+     */
     public function render()
     {
         $company = Company::with(['departments', 'locations', 'designations'])->find($this->companyId);
@@ -254,6 +326,11 @@ class AddEmployeeDetails extends Component
         ]);
     }
 
+    /**
+     * Save the employee details from the form.
+     *
+     * @return \Illuminate\Http\RedirectResponse|void
+     */
     public function save()
     {
         Log::debug("Saving employee data");
@@ -261,85 +338,37 @@ class AddEmployeeDetails extends Component
         try {
             $this->validate();
 
-            $departmentName = trim($this->department);
-            $designationName = trim($this->designation);
-            $locationName = trim($this->location);
-
-            $department = Department::firstOrCreate([
-                'company_id' => (int) $this->companyId,
-                'department_name' => $departmentName,
-            ]);
-
-            $designation = Designation::firstOrCreate([
-                'company_id' => (int) $this->companyId,
-                'designation_name' => $designationName,
-            ]);
-
-            $location = Location::query()
-                ->where('company_id', (int) $this->companyId)
-                ->whereRaw('LOWER(location_name) = ?', [Str::lower($locationName)])
-                ->first();
-
-            if (!$location) {
-                $base = preg_replace('/[^A-Z0-9]/', '', Str::upper($locationName));
-                $prefix = Str::substr($base ?: 'LOC', 0, 6);
-                $locationCode = $prefix . Str::upper(Str::random(4));
-
-                $location = Location::create([
-                    'company_id' => (int) $this->companyId,
-                    'location_name' => $locationName,
-                    'location_code' => $locationCode,
-                    'location_address' => '',
-                    'location_city' => '',
-                    'location_state' => '',
-                    'location_pincode' => '',
-                    'location_country' => '',
-                    'location_phone' => '',
-                    'location_email' => '',
-                ]);
-
-                Log::info('Created location on employee save', [
-                    'company_id' => $this->companyId,
-                    'location_id' => $location->id,
-                    'location_name' => $locationName,
-                ]);
-            }
-
-            $fullName = trim(implode(' ', array_filter([
-                $this->firstName,
-                $this->middleName,
-                $this->lastName,
-            ])));
-
-            $payload = [
-                'company_id' => (int) $this->companyId,
-                'employee_code' => $this->employeeCompanyCode,
-                'employee_name' => $fullName,
+            $employeeService = app(EmployeeService::class);
+            $result = $employeeService->createFromForm((int) $this->companyId, [
+                'first_name' => $this->firstName,
+                'middle_name' => $this->middleName,
+                'last_name' => $this->lastName,
                 'father_name' => $this->fatherName,
-                'gender' => strtoupper(substr($this->gender, 0, 1)), // M/F/O
+                'gender' => $this->gender,
                 'dob' => $this->dob ?: null,
-                'doj' => $this->joiningDate ?: null,
-                'dol' => $this->leavingDate ?: null,
+                'department' => $this->department,
+                'designation' => $this->designation,
+                'location' => $this->location,
+                'employee_code' => $this->employeeCompanyCode,
+                'joining_date' => $this->joiningDate ?: null,
+                'leaving_date' => $this->leavingDate ?: null,
                 'esi_no' => $this->esiNo ?: null,
                 'pf_no' => $this->pfNo ?: null,
-                'department_id' => $department->id,
-                'designation_id' => $designation->id,
-                'location_id' => $location->id,
+                'account_no' => $this->accountNo ?: null,
                 'bank_name' => $this->bankName ?: null,
-                'bank_account_no' => $this->accountNo ?: null,
-                'bank_ifsc_code' => $this->ifscCode ?: null,
-            ];
+                'ifsc_code' => $this->ifscCode ?: null,
+            ], $this->employeeId);
 
-            if ($this->employeeId) {
-                $employee = Employee::where('company_id', $this->companyId)->findOrFail($this->employeeId);
-                $employee->update($payload);
+            if ($result['action'] === 'updated') {
                 session()->flash('success', 'Employee details updated successfully!');
-                return redirect()->route('employee-details', ['company_id' => $this->companyId, 'employee_id' => $employee->id]);
+                return redirect()->route('employee-details', [
+                    'company_id' => $this->companyId,
+                    'employee_id' => $result['employee']->id,
+                ]);
             }
 
-            $employee = Employee::create($payload);
             session()->flash('success', 'Employee details saved successfully!');
-            $this->resetExcept('companyId'); // Clear the form after successful save
+            $this->resetExcept('companyId');
         }
         catch(QueryException $e){
             Log::error("Error occurred in saving employee to database due to SQL Exception: " . $e->getMessage(), [
@@ -368,8 +397,9 @@ class AddEmployeeDetails extends Component
     }
 
     /**
-     * Validate the Excel import input (file, department, and location)
-     * Returns an array of issues (empty if valid)
+     * Handle the Excel import of employees.
+     *
+     * @return void
      */
     public function importEmployees()
     {
@@ -391,7 +421,7 @@ class AddEmployeeDetails extends Component
             $headingRow = 1;
             $realPath = $this->excelFile?->getRealPath();
             if (is_string($realPath) && $realPath !== '' && file_exists($realPath)) {
-                $headingRow = $this->detectHeadingRow($realPath);
+                $headingRow = app(EmployeeService::class)->detectHeadingRow($realPath);
             }
 
             $import = new EmployeeImport((int) $this->companyId, (int) $headingRow);
@@ -427,6 +457,11 @@ class AddEmployeeDetails extends Component
         }
     }
 
+    /**
+     * Export employees to an Excel file.
+     *
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|void
+     */
     public function exportToExcel()
     {
         try {

@@ -53,7 +53,7 @@ $colors: (
 ) !default;
 // scss-docs-end colors-map
 
-$primary:       #f53939 !default;
+$primary:       #0052ff !default;
 $secondary:     #8392AB !default;
 $info:          #17c1e8 !default;
 $success:       #82d616 !default;
@@ -77,9 +77,17 @@ $theme-colors: (
 // scss-docs-end theme-colors-map
 
 
+// Brand gradient palette (light blue → royal blue → black)
+$brand-gradient-light:        #f0f4ff !default;
+$brand-gradient-mid:          #0052ff !default;
+$brand-gradient-navy:         #001a3d !default;
+$brand-gradient-black:        #000000 !default;
+$brand-gradient-angle:        180deg !default;
+$brand-gradient:              linear-gradient($brand-gradient-angle, $brand-gradient-light 0%, $brand-gradient-mid 35%, $brand-gradient-black 100%) !default;
+
 // Gradient colors
-$primary-gradient:            #f53939 !default;
-$primary-gradient-state:      #fbcf33 !default;
+$primary-gradient:            $brand-gradient-mid !default;
+$primary-gradient-state:      $brand-gradient-black !default;
 
 $secondary-gradient:          #627594 !default;
 $secondary-gradient-state:    #A8B8D8 !default;
@@ -93,8 +101,8 @@ $success-gradient-state:      #98ec2d !default;
 $danger-gradient:             #ea0606 !default;
 $danger-gradient-state:       #ff667c !default;
 
-$warning-gradient:            #f53939 !default;
-$warning-gradient-state:      #fbcf33 !default;
+$warning-gradient:            #ff9800 !default;
+$warning-gradient-state:      #ffc107 !default;
 
 $dark-gradient:               #141727 !default;
 $dark-gradient-state:         #3A416F !default;
@@ -115,6 +123,19 @@ $theme-gradient-colors: (
   "danger":     ($danger-gradient, $danger-gradient-state),
   "light":      ($light-gradient, $light-gradient-state),
   "dark":       ($dark-gradient, $dark-gradient-state)
+) !default;
+
+// Alert / notification bar gradients (industry-standard semantic colors)
+$alert-gradient-angle:        310deg !default;
+$alert-gradient-colors: (
+  "primary":    (#2152ff, #21d4fd),
+  "secondary":  (#627594, #A8B8D8),
+  "success":    (#17ad37, #98ec2d),
+  "info":       (#17c1e8, #21d4fd),
+  "warning":    (#ff9800, #ffc107),
+  "danger":     (#ea0606, #ff667c),
+  "light":      (#CED4DA, #EBEFF4),
+  "dark":       (#141727, #3A416F)
 ) !default;
 
 // Set a specific jump point for requesting color jumps
@@ -560,12 +581,12 @@ $text-gradient-bg-clip:       text !default;
 $text-gradient-text-fill:     transparent !default;
 $text-gradient-position:      relative !default;
 $text-gradient-zindex:        1 !default;
-$text-gradient-bg-primary:    linear-gradient(310deg, #7928CA, #FF0080) !default;
-$text-gradient-bg-info:       linear-gradient(310deg, #2152FF, #21D4FD) !default;
-$text-gradient-bg-success:    linear-gradient(310deg, #17AD37, #C1E823) !default;
-$text-gradient-bg-warning:    linear-gradient(310deg, #F53939, #FBCF33) !default;
-$text-gradient-bg-danger:     linear-gradient(310deg, #D60808, #FF6690) !default;
-$text-gradient-bg-dark:     linear-gradient(310deg, #141727, #3A416F) !default;
+$text-gradient-bg-primary:    $brand-gradient !default;
+$text-gradient-bg-info:       linear-gradient($brand-gradient-angle, #2152ff, #21d4fd) !default;
+$text-gradient-bg-success:    linear-gradient($brand-gradient-angle, #17ad37, #98ec2d) !default;
+$text-gradient-bg-warning:    linear-gradient($brand-gradient-angle, #ff9800, #ffc107) !default;
+$text-gradient-bg-danger:     linear-gradient($brand-gradient-angle, #ea0606, #ff667c) !default;
+$text-gradient-bg-dark:       linear-gradient($brand-gradient-angle, #141727, #3A416F) !default;
 
 $initialism-font-size:        $small-font-size !default;
 
@@ -887,7 +908,7 @@ $form-check-input-focus-box-shadow:       none !default;
 $form-check-input-checked-color:          $white !default;
 $form-check-input-checked-bg-color:       transparent !default;
 $form-check-input-checked-border-color:   $form-check-input-checked-bg-color !default;
-$form-check-input-checked-bg-image:       linear-gradient(310deg, $dark-gradient 0%, $dark-gradient-state 100%) !default;
+$form-check-input-checked-bg-image:       linear-gradient($brand-gradient-angle, $dark-gradient 0%, $dark-gradient-state 100%) !default;
 $form-check-radio-checked-bg-image:       $form-check-input-checked-bg-image !default;
 $form-check-radio-after-width:                  .5rem !default;
 

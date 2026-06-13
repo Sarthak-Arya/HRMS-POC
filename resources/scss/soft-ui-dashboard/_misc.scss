@@ -42,7 +42,7 @@
   backdrop-filter: $blur-backdrop-filter;
 
   &.blur-gradient-primary {
-    @include gradient-directional(rgba($primary-gradient, .95) 0%, rgba($primary-gradient-state, .95) 100%, $deg: 310deg);
+    @include gradient-directional(rgba($primary-gradient, .95) 0%, rgba($primary-gradient-state, .95) 100%, $deg: $brand-gradient-angle);
   }
 }
 

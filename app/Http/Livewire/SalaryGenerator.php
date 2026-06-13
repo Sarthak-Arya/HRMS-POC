@@ -13,19 +13,47 @@ use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Livewire component for generating employee salaries.
+ * Handles filtering employees and dispatching batch jobs for salary processing.
+ */
 class SalaryGenerator extends Component
 {
+    /** @var string Selected department ID for filtering */
     public $selectedDepartment = '';
+
+    /** @var string Selected designation ID for filtering */
     public $selectedDesignation = '';
+
+    /** @var string Start date for salary generation */
     public $fromDate = '';
+
+    /** @var string End date for salary generation */
     public $toDate = '';
+
+    /** @var array<int, array<string, string>> Available date ranges from attendance */
     public $dateRanges = [];
+
+    /** @var \Illuminate\Database\Eloquent\Collection|array List of departments */
     public $departments = [];
+
+    /** @var \Illuminate\Database\Eloquent\Collection|array List of designations */
     public $designations = [];
+
+    /** @var string|null ID of the currently processing payroll batch */
     public $batchId = null;
+
+    /** @var int Progress percentage of the batch */
     public $progress = 0;
+
+    /** @var string Current status of the batch */
     public $status = '';
 
+    /**
+     * Validation rules for the component.
+     *
+     * @var array<string, string>
+     */
     protected $rules = [
         'selectedDepartment' => 'nullable|exists:departments,id',
         'selectedDesignation' => 'nullable|exists:designations,id',
@@ -33,19 +61,34 @@ class SalaryGenerator extends Component
         'toDate' => 'required|date|after_or_equal:fromDate'
     ];
 
+    /**
+     * Initialize the component.
+     *
+     * @return void
+     */
     public function mount()
     {
         $this->loadDepartmentsAndDesignations();
         $this->loadDateRanges();
     }
 
+    /**
+     * Load departments and designations for the current company.
+     *
+     * @return void
+     */
     public function loadDepartmentsAndDesignations()
     {
-        $companyId = session()->get("companyIdNum");
+        $companyId = session()->get('companyId');
         $this->departments = Department::where('company_id', $companyId)->get();
         $this->designations = Designation::where('company_id', $companyId)->get();
     }
 
+    /**
+     * Load available date ranges based on existing attendance records.
+     *
+     * @return void
+     */
     public function loadDateRanges()
     {
         $this->dateRanges = DB::table('attendances')
@@ -60,6 +103,11 @@ class SalaryGenerator extends Component
             });
     }
 
+    /**
+     * Hook called when fromDate property is updated.
+     *
+     * @return void
+     */
     public function updatedFromDate()
     {
         $this->validateOnly('fromDate');
@@ -68,11 +116,22 @@ class SalaryGenerator extends Component
         }
     }
 
+    /**
+     * Hook called when toDate property is updated.
+     *
+     * @return void
+     */
     public function updatedToDate()
     {
         $this->validateOnly('toDate');
     }
 
+    /**
+     * Trigger the salary generation process.
+     * Dispatches a batch of jobs for each matching employee.
+     *
+     * @return void
+     */
     public function generateSalaries()
     {
         $this->validate();
@@ -138,6 +197,11 @@ class SalaryGenerator extends Component
         $payrollBatch->update(['batch_id' => $this->batchId]);
     }
 
+    /**
+     * Get the current progress of the payroll batch.
+     *
+     * @return int Progress percentage.
+     */
     public function getProgressProperty()
     {
         if (!$this->batchId) {
@@ -155,6 +219,11 @@ class SalaryGenerator extends Component
             : 0;
     }
 
+    /**
+     * Render the component view.
+     *
+     * @return \Illuminate\View\View
+     */
     public function render()
     {
         return view('livewire.salary-generator');

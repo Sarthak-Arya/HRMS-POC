@@ -150,9 +150,14 @@
             @if (isset($employeeId) && $employeeId)
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="text-sm text-muted">Editing employee</div>
-                    <a href="{{ route('employee-details', ['company_id' => $companyId, 'employee_id' => $employeeId]) }}" class="btn btn-sm btn-outline-dark">
-                        Back to view
-                    </a>
+                    <div class="d-flex gap-2">
+                        <a href="{{ route('employee-compensation', ['company_id' => $companyId, 'employee_id' => $employeeId]) }}" class="btn btn-sm btn-outline-dark">
+                            Manage Compensation
+                        </a>
+                        <a href="{{ route('employee-details', ['company_id' => $companyId, 'employee_id' => $employeeId]) }}" class="btn btn-sm btn-outline-dark">
+                            Back to view
+                        </a>
+                    </div>
                 </div>
             @endif
             <h5>Personal Details</h5>

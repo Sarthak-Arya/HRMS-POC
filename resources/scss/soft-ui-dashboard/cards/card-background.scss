@@ -62,7 +62,7 @@
         }
 
         &:after {
-          @include gradient-directional(nth($val, 1) 0%, nth($val, -1) 100%, $deg: 310deg);
+          @include gradient-directional(nth($val, 1) 0%, nth($val, -1) 100%, $deg: $brand-gradient-angle);
           opacity: .85;
         }
       }

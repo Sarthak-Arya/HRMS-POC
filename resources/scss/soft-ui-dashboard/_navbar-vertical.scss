@@ -171,7 +171,7 @@
   @each $color, $value in $theme-colors {
     &[data-color="#{$color}"] {
       .navbar-nav > .nav-item > .nav-link.active .icon {
-        @include gradient-directional(nth(#{$value}, 1) 0%, nth(#{$value}, -1) 100%, $deg: 310deg);
+        @include gradient-directional(nth(#{$value}, 1) 0%, nth(#{$value}, -1) 100%, $deg: $brand-gradient-angle);
       }
     }
   }
@@ -292,7 +292,7 @@
         }
 
         .icon {
-          @include gradient-directional(nth($light, 1) 0%, nth($light, -1) 100%, $deg: 310deg);
+          @include gradient-directional(nth($light, 1) 0%, nth($light, -1) 100%, $deg: $brand-gradient-angle);
         }
       }
     }
@@ -309,7 +309,7 @@
     background-color: $white;
 
     .icon {
-      @include gradient-directional(nth($primary, 1) 0%, nth($primary, -1) 100%, $deg: 310deg);
+      @include gradient-directional(nth($primary, 1) 0%, nth($primary, -1) 100%, $deg: $brand-gradient-angle);
 
       svg {
         .color-background,

@@ -10,10 +10,16 @@
                     <h5 class="mb-0">{{ $employee->employee_name }}</h5>
                     <div class="text-sm text-muted">Employee Code: {{ $employee->employee_code }}</div>
                 </div>
-                <a href="{{ route('edit-employee-details', ['company_id' => $companyId, 'employee_id' => $employee->id]) }}"
-                    class="btn btn-sm bg-gradient-dark">
-                    Edit
-                </a>
+                <div class="d-flex gap-2">
+                    <a href="{{ route('employee-compensation', ['company_id' => $companyId, 'employee_id' => $employee->id]) }}"
+                        class="btn btn-sm btn-outline-dark">
+                        Manage Compensation
+                    </a>
+                    <a href="{{ route('edit-employee-details', ['company_id' => $companyId, 'employee_id' => $employee->id]) }}"
+                        class="btn btn-sm bg-gradient-dark">
+                        Edit
+                    </a>
+                </div>
             </div>
 
             <div class="row">
