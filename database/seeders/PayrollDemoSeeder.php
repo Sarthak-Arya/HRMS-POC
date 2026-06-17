@@ -26,6 +26,7 @@ class PayrollDemoSeeder extends Seeder
             DepartmentSeeder::class,
             EmployeeSeeder::class,
             CompensationSeeder::class,
+            PayrollV2Seeder::class,
         ]);
     }
 }

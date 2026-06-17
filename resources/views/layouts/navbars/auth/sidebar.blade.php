@@ -2,20 +2,19 @@
     id="sidenav-main">
     <div class="sidenav-header d-flex align-items-center justify-content-between" style="flex-direction: row;">
         <div class="d-flex align-items-center">
-            <a class="align-items-center d-flex m-0 navbar-brand text-wrap" href="{{ route('dashboard', ['company_id' => request()->session()->get('companyId')])}}">
+            <a class="align-items-center d-flex m-0 navbar-brand text-wrap"
+                href="{{ route('dashboard', ['company_id' => request()->session()->get('companyId')]) }}">
                 <img src="../assets/img/logo-ct.png" class="navbar-brand-img h-100" alt="...">
                 <span class="ms-3 font-weight-bold">Aryans Associates Payroll System</span>
             </a>
         </div>
         <!-- Collapse Button -->
-        <button id="sidebarCollapseBtn"
-            type="button"
-            class="btn"
+        <button id="sidebarCollapseBtn" type="button" class="btn"
             style="font-size: 1.0rem; background: transparent; border: none; box-shadow: none; margin-left: 8px; padding: 4px;">
             <i class="fa fa-times" style="color: #344767;"></i>
         </button>
     </div>
-    
+
     <hr class="horizontal dark mt-0">
     <div class="collapse navbar-collapse w-auto h-100" id="sidenav-collapse-main">
         <ul class="navbar-nav">
@@ -121,7 +120,8 @@
                         <svg width="12px" height="12px" viewBox="0 0 46 42" version="1.1"
                             xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
                             <title>customer-support</title>
-                            <g id="Basic-Elements" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                            <g id="Basic-Elements" stroke="none" stroke-width="1" fill="none"
+                                fill-rule="evenodd">
                                 <g id="Rounded-Icons" transform="translate(-1717.000000, -291.000000)" fill="#FFFFFF"
                                     fill-rule="nonzero">
                                     <g id="Icons-with-opacity" transform="translate(1716.000000, 291.000000)">
@@ -155,7 +155,8 @@
                         <svg width="12px" height="12px" viewBox="0 0 46 42" version="1.1"
                             xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
                             <title>customer-support</title>
-                            <g id="Basic-Elements" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                            <g id="Basic-Elements" stroke="none" stroke-width="1" fill="none"
+                                fill-rule="evenodd">
                                 <g id="Rounded-Icons" transform="translate(-1717.000000, -291.000000)" fill="#FFFFFF"
                                     fill-rule="nonzero">
                                     <g id="Icons-with-opacity" transform="translate(1716.000000, 291.000000)">
@@ -179,14 +180,15 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {{ Route::currentRouteName() == 'salary-generator' ? 'active' : '' }}"
-                    href="{{ route('salary-generator', ['company_id' => request()->session()->get('companyId')])}}">
+                <a class="nav-link {{ in_array(Route::currentRouteName(), ['salary-generator', 'payroll-run-detail', 'employee-payroll-detail']) ? 'active' : '' }}"
+                    href="{{ route('salary-generator', ['company_id' => request()->session()->get('companyId')]) }}">
                     <div
                         class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
                         <svg width="12px" height="12px" viewBox="0 0 46 42" version="1.1"
                             xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
                             <title>customer-support</title>
-                            <g id="Basic-Elements" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                            <g id="Basic-Elements" stroke="none" stroke-width="1" fill="none"
+                                fill-rule="evenodd">
                                 <g id="Rounded-Icons" transform="translate(-1717.000000, -291.000000)" fill="#FFFFFF"
                                     fill-rule="nonzero">
                                     <g id="Icons-with-opacity" transform="translate(1716.000000, 291.000000)">
@@ -206,7 +208,19 @@
                             </g>
                         </svg>
                     </div>
-                    <span class="nav-link-text ms-1">Generate Salary</span>
+                    <span class="nav-link-text ms-1">Payroll Runs</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ Route::currentRouteName() == 'payroll-history' ? 'active' : '' }}"
+                    href="{{ route('payroll-history', ['company_id' => request()->session()->get('companyId')]) }}">
+                    <div class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
+                        <svg width="12px" height="12px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 8V12L15 15" stroke="#344767" stroke-width="2" stroke-linecap="round"/>
+                            <circle cx="12" cy="12" r="9" stroke="#344767" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <span class="nav-link-text ms-1">Payroll History</span>
                 </a>
             </li>
 
@@ -308,8 +322,7 @@
     </div>
 </aside>
 <!-- Floating Sidebar Toggle Button -->
-<button id="showSidebarBtn"
-    type="button"
+<button id="showSidebarBtn" type="button"
     style="
         display: none;
         position: fixed;
@@ -366,21 +379,22 @@
     });
 </script>
 <style>
-  body:not(.g-sidenav-pinned) .sidenav {
-    width: 0 !important;
-    min-width: 0 !important;
-    overflow: hidden;
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s, opacity 0.3s;
-    opacity: 0.2;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-  }
-  body.g-sidenav-pinned .sidenav {
-    width: 250px;
-    min-width: 250px;
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s, opacity 0.3s;
-    opacity: 1;
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
-  }
+    body:not(.g-sidenav-pinned) .sidenav {
+        width: 0 !important;
+        min-width: 0 !important;
+        overflow: hidden;
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s, opacity 0.3s;
+        opacity: 0.2;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    body.g-sidenav-pinned .sidenav {
+        width: 250px;
+        min-width: 250px;
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s, opacity 0.3s;
+        opacity: 1;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
 </style>

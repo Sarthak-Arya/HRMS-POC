@@ -83,5 +83,15 @@ class Company extends Model
     public function handledBy(): BelongsTo{
         return $this->belongsTo(User::class);
     }
+
+    /**
+     * Get payroll runs for the company.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function payrollRuns()
+    {
+        return $this->hasMany(PayrollRun::class);
+    }
 }
 

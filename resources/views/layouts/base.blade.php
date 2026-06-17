@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <!-- Metas -->
-    @if(env('IS_DEMO'))
+    @if (env('IS_DEMO'))
         <x-demo-metas></x-demo-metas>
     @endif
     <link rel="apple-touch-icon" sizes="76x76" href="../assets/img/apple-icon.png">
@@ -13,10 +13,11 @@
     <title>
         Soft UI Dashboard by Creative Tim
     </title>
-    
+
     <!-- Fonts and icons     -->
     <script src="https://kit.fontawesome.com/bcb22c69aa.js" crossorigin="anonymous"></script>
     <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <!-- Nucleo Icons -->
     <link href="{{ asset('assets/css/nucleo-icons.css') }}" rel="stylesheet" />
     <link href="{{ asset('assets/css/nucleo-svg.css') }}" rel="stylesheet" />
@@ -30,68 +31,75 @@
     <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
     @livewireStyles
     <style>
-  .main-content {
-    margin-left: 0;
-    width: 100%;
-    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  body.g-sidenav-pinned {
-    margin-left: 15.625rem;
-    width: calc(100% - 15.625rem);
-    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  body:not(.g-sidenav-pinned) .main-content {
-    margin-left: 0;
-    width: 100%;
-    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
+        .main-content {
+            margin-left: 0;
+            width: 100%;
+            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
 
-  /* Theme: dark */
-  body.theme-dark {
-    --bs-body-bg: #0b1220;
-    --bs-body-color: #e5e7eb;
-    background-color: var(--bs-body-bg) !important;
-    color: var(--bs-body-color) !important;
-  }
-  body.theme-dark .card,
-  body.theme-dark .modal-content,
-  body.theme-dark .dropdown-menu {
-    background-color: #111827;
-    color: #e5e7eb;
-    border-color: #1f2937;
-  }
-  body.theme-dark .text-dark,
-  body.theme-dark .breadcrumb-item.text-dark,
-  body.theme-dark .breadcrumb-item.text-dark.active {
-    color: #e5e7eb !important;
-  }
-  body.theme-dark .form-control {
-    background-color: #0f172a;
-    color: #e5e7eb;
-    border-color: #334155;
-  }
-  body.theme-dark .form-control::placeholder {
-    color: #94a3b8;
-  }
-  body.theme-dark hr {
-    border-color: rgba(148, 163, 184, 0.35);
-  }
+        body.g-sidenav-pinned {
+            margin-left: 15.625rem;
+            width: calc(100% - 15.625rem);
+            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
 
-  /* Prevent sidenav toggler overlapping breadcrumb (desktop sizes can still be < xl). */
-	  @media (max-width: 2000px) {
-	    #navbarBlur nav[aria-label="breadcrumb"],
-	    #navbarBlur h6 {
-	      padding-left: 3rem;
-	    }
-	  }
+        body:not(.g-sidenav-pinned) .main-content {
+            margin-left: 0;
+            width: 100%;
+            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
 
-	  /* Sidebar: reduce left/right gutter so items align closer to the edge */
-	  .navbar-vertical.navbar-expand-xs .navbar-nav .nav-link {
-	    margin-left: -0.99rem;
-	    margin-right: 0.15rem;
-	  }
-	</style>
+        /* Theme: dark */
+        body.theme-dark {
+            --bs-body-bg: #0b1220;
+            --bs-body-color: #e5e7eb;
+            background-color: var(--bs-body-bg) !important;
+            color: var(--bs-body-color) !important;
+        }
+
+        body.theme-dark .card,
+        body.theme-dark .modal-content,
+        body.theme-dark .dropdown-menu {
+            background-color: #111827;
+            color: #e5e7eb;
+            border-color: #1f2937;
+        }
+
+        body.theme-dark .text-dark,
+        body.theme-dark .breadcrumb-item.text-dark,
+        body.theme-dark .breadcrumb-item.text-dark.active {
+            color: #e5e7eb !important;
+        }
+
+        body.theme-dark .form-control {
+            background-color: #0f172a;
+            color: #e5e7eb;
+            border-color: #334155;
+        }
+
+        body.theme-dark .form-control::placeholder {
+            color: #94a3b8;
+        }
+
+        body.theme-dark hr {
+            border-color: rgba(148, 163, 184, 0.35);
+        }
+
+        /* Prevent sidenav toggler overlapping breadcrumb (desktop sizes can still be < xl). */
+        @media (max-width: 2000px) {
+
+            #navbarBlur nav[aria-label="breadcrumb"],
+            #navbarBlur h6 {
+                padding-left: 3rem;
+            }
+        }
+
+        /* Sidebar: reduce left/right gutter so items align closer to the edge */
+        .navbar-vertical.navbar-expand-xs .navbar-nav .nav-link {
+            margin-left: -0.99rem;
+            margin-right: 0.15rem;
+        }
+    </style>
 
 </head>
 
@@ -111,15 +119,15 @@
             }
             Scrollbar.init(document.querySelector('#sidenav-scrollbar'), options);
         }
-
     </script>
     <!-- Control Center for Soft Dashboard: parallax effects, scripts for the example pages etc -->
     <script src="{{ asset('assets/js/soft-ui-dashboard.js') }}"></script>
     <script>
-        (function () {
+        (function() {
             function preferredTheme() {
                 if (localStorage.getItem('theme')) return localStorage.getItem('theme');
-                return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+                return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' :
+                    'light';
             }
 
             function applyTheme(theme) {
@@ -130,23 +138,23 @@
             }
 
             window.__applyTheme = applyTheme;
-            window.__toggleTheme = function () {
+            window.__toggleTheme = function() {
                 var next = document.body.classList.contains('theme-dark') ? 'light' : 'dark';
                 applyTheme(next);
             };
 
-            document.addEventListener('DOMContentLoaded', function () {
+            document.addEventListener('DOMContentLoaded', function() {
                 applyTheme(preferredTheme());
             });
 
-            document.addEventListener('change', function (e) {
+            document.addEventListener('change', function(e) {
                 if (e.target && e.target.id === 'theme-toggle') {
                     applyTheme(e.target.checked ? 'dark' : 'light');
                 }
             });
 
             // If Livewire swaps the navbar, re-sync the toggle state.
-            document.addEventListener('livewire:load', function () {
+            document.addEventListener('livewire:load', function() {
                 applyTheme(preferredTheme());
             });
         })();

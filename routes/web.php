@@ -21,7 +21,11 @@ use App\Http\Livewire\AddCompanyDetails;
 use App\Http\Livewire\ViewCompanies;
 use App\Http\Livewire\CompensationHub;
 use App\Http\Livewire\EmployeeCompensation;
-use App\Http\Livewire\SalaryGenerator;
+use App\Http\Livewire\PayrollRunList;
+use App\Http\Livewire\PayrollRunDetail;
+use App\Http\Livewire\EmployeePayrollDetail;
+use App\Http\Livewire\PayrollHistory;
+use App\Http\Controllers\PayslipController;
 
 use App\Http\Middleware\CompanyAccessMiddleware;
 
@@ -62,7 +66,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/add-company-details', AddCompanyDetails::class)->name('add-company-details');
     Route::get('/view-companies', ViewCompanies::class)->name('view-companies');
     Route::post('/import-excel', [App\Http\Controllers\ImportExcel::class, 'import'])->name('import.excel');
-    
+
     // Employee template download route
     Route::get('/download-employee-template', [App\Http\Controllers\EmployeeTemplateController::class, 'downloadTemplate'])->name('download.template');
 
@@ -77,12 +81,17 @@ Route::middleware('auth')->group(function () {
                 return redirect()->route('compensation', ['company_id' => $company_id]);
             })->name('compensation-structures');
             Route::get('/employee-compensation/{employee_id}', action: EmployeeCompensation::class)->name('employee-compensation');
-            Route::get('/salary-generator', action: SalaryGenerator::class)->name('salary-generator');
+            Route::get('/salary-generator', action: PayrollRunList::class)->name('salary-generator');
+            Route::get('/payroll-runs/{run_id}', action: PayrollRunDetail::class)->name('payroll-run-detail');
+            Route::get('/payroll-runs/{run_id}/employees/{employee_payroll_id}', action: EmployeePayrollDetail::class)->name('employee-payroll-detail');
+            Route::get('/payroll-history', action: PayrollHistory::class)->name('payroll-history');
+            Route::get('/payroll-runs/{run_id}/payslips/{employee_payroll_id}', [PayslipController::class, 'download'])->name('payroll.payslip');
+            Route::get('/payroll-runs/{run_id}/payslips', [PayslipController::class, 'downloadBulk'])->name('payroll.payslip.bulk');
             Route::get('/view-employee-details', action: EmployeeList::class)->name('view-employee-details');
             Route::get('/view-employee-details/{employee_id}', action: ViewEmployeeDetails::class)->name('employee-details');
             Route::get('/attendance-entry', AttendanceEntry::class)->name('attendance-entry');
         });
-        
+
     });
 
     Route::get('/tables', action: Tables::class)->name('tables');

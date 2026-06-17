@@ -200,4 +200,44 @@ class Employee extends Model
     {
         return $this->hasMany(Deduction::class);
     }
+
+    /**
+     * Get the v2 employee payroll records for the employee.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function employeePayrolls()
+    {
+        return $this->hasMany(EmployeePayroll::class);
+    }
+
+    /**
+     * Get the employee loans.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function loans()
+    {
+        return $this->hasMany(EmployeeLoan::class);
+    }
+
+    /**
+     * Get the payroll adjustments for the employee.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function payrollAdjustments()
+    {
+        return $this->hasMany(PayrollAdjustment::class);
+    }
+
+    /**
+     * Get monthly attendance summaries for the employee.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function monthlyAttendances()
+    {
+        return $this->hasMany(MonthlyAttendance::class, 'employee_id');
+    }
 }

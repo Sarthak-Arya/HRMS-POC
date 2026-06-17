@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MonthlyAttendance extends Model
 {
@@ -53,4 +55,19 @@ class MonthlyAttendance extends Model
         'ded_3' => 'decimal:2',
         'deductions' => 'array',
     ];
+
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function employeePayrolls(): HasMany
+    {
+        return $this->hasMany(EmployeePayroll::class, 'attendance_summary_id');
+    }
 }

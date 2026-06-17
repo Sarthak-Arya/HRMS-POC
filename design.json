@@ -1,0 +1,563 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "finance-dashboard-design-system",
+    "meta": {
+      "name": "Finance / Crypto Dashboard Design System",
+      "style": "Modern Soft UI – Card-based fintech dashboard",
+      "aesthetic": "Light neomorphic with bold accent cards, muted sage background, high-contrast data readouts",
+      "use_case": "Financial data dashboards, crypto portfolio trackers, analytics UIs",
+      "design_principles": [
+        "Cards as primary layout unit — each metric lives in its own elevated tile",
+        "High contrast between card types (dark, white, color-fill) for visual hierarchy",
+        "Minimal chrome — no heavy borders or dividers, whitespace does the separation work",
+        "Data is the hero — numbers are large, labels are small and muted",
+        "Accent color signals interactivity and positive states"
+      ]
+    },
+  
+    "tokens": {
+  
+      "color": {
+        "description": "Full palette used across the UI",
+  
+        "background": {
+          "page": "#D8E5DB",
+          "page_note": "Muted sage green — the global canvas. Every card floats on this.",
+          "card_white": "#FFFFFF",
+          "card_dark": "#1C1C1E",
+          "card_dark_note": "Near-black, used for hero stats / primary feature card",
+          "card_green": "#7EE8A2",
+          "card_green_note": "Bright mint green — high-energy accent card (balance, BTC price)",
+          "card_purple": "#A78BFA",
+          "card_purple_note": "Soft violet — secondary accent card (market cap, charts)"
+        },
+  
+        "text": {
+          "primary_on_dark": "#FFFFFF",
+          "primary_on_light": "#111111",
+          "secondary_on_light": "#6B7280",
+          "secondary_note": "Muted gray for subtitles, timestamps, labels",
+          "data_large_on_green": "#111111",
+          "data_large_on_purple": "#FFFFFF",
+          "positive_indicator": "#22C55E",
+          "positive_indicator_note": "Bright green used for upward trend badges and delta labels"
+        },
+  
+        "accent": {
+          "primary_green": "#7EE8A2",
+          "primary_green_hex_note": "Main accent — fills cards, progress bars, icon backgrounds",
+          "secondary_purple": "#A78BFA",
+          "dot_indicator": "#8B5CF6",
+          "dot_indicator_note": "Small purple dot used as a live/active position marker on gauges"
+        },
+  
+        "border": {
+          "card_radius_color": "transparent",
+          "shadow": "rgba(0, 0, 0, 0.08)",
+          "shadow_note": "Very soft drop shadow on white cards to lift them off the page bg"
+        },
+  
+        "chart": {
+          "bar_primary": "#4ADE80",
+          "bar_primary_note": "Tall bars in bar charts — bright green",
+          "bar_secondary": "#A78BFA",
+          "bar_secondary_note": "Contrasting bar segments within the same chart",
+          "area_fill": "#7EE8A2",
+          "area_stroke": "#22C55E",
+          "gauge_track": "#E5E7EB",
+          "gauge_filled": "#1C1C1E",
+          "gauge_filled_note": "Dark arc on the balance gauge card",
+          "progress_bar_bg": "#D1FAE5",
+          "progress_bar_fill": "#4ADE80"
+        }
+      },
+  
+      "typography": {
+        "font_stack": {
+          "primary": "'Inter', 'SF Pro Display', system-ui, sans-serif",
+          "note": "Modern geometric sans. Clean, neutral, highly legible at all sizes. Data-first."
+        },
+        "scale": {
+          "display_xl": {
+            "size": "36px",
+            "weight": 700,
+            "line_height": 1.1,
+            "usage": "Hero metric numbers (e.g. '2,025', '15,368$', '1,3trln$')",
+            "letter_spacing": "-0.02em"
+          },
+          "display_lg": {
+            "size": "28px",
+            "weight": 700,
+            "line_height": 1.15,
+            "usage": "Secondary large numbers (BTC price '21,105$')",
+            "letter_spacing": "-0.015em"
+          },
+          "heading": {
+            "size": "16px",
+            "weight": 600,
+            "line_height": 1.3,
+            "usage": "Card titles ('Sales statistics', 'Current balance', 'Market forecast')"
+          },
+          "label": {
+            "size": "12px",
+            "weight": 400,
+            "line_height": 1.4,
+            "usage": "Subtitles, timestamps, axis labels ('Updated 1 days ago', 'Sell currency')",
+            "color_role": "secondary_on_light"
+          },
+          "tag": {
+            "size": "11px",
+            "weight": 500,
+            "line_height": 1,
+            "usage": "Pill badges, dropdown labels ('Monthly', '+28,21%')"
+          },
+          "timeline_year": {
+            "size": "13px",
+            "weight": 700,
+            "line_height": 1,
+            "usage": "Year markers in timeline ('2023', '2024', '2025', '2027')"
+          },
+          "timeline_body": {
+            "size": "12px",
+            "weight": 400,
+            "line_height": 1.5,
+            "usage": "Timeline event descriptions"
+          }
+        }
+      },
+  
+      "spacing": {
+        "base_unit": "4px",
+        "scale": {
+          "xs": "4px",
+          "sm": "8px",
+          "md": "16px",
+          "lg": "24px",
+          "xl": "32px",
+          "2xl": "48px"
+        },
+        "card_padding": "20px 24px",
+        "card_padding_compact": "16px 20px",
+        "grid_gap": "16px"
+      },
+  
+      "radius": {
+        "card": "24px",
+        "card_note": "All dashboard cards use a large, consistent border radius",
+        "button": "20px",
+        "button_note": "Pills and action buttons are fully rounded",
+        "badge": "8px",
+        "icon_wrapper": "12px",
+        "progress_bar": "999px",
+        "inner_card": "16px",
+        "inner_card_note": "Nested elements / inner tiles within cards (e.g., BTC price sub-card)"
+      },
+  
+      "shadow": {
+        "card_default": "0 4px 24px rgba(0, 0, 0, 0.08)",
+        "card_elevated": "0 8px 32px rgba(0, 0, 0, 0.12)",
+        "icon_wrapper": "0 2px 8px rgba(0, 0, 0, 0.06)"
+      },
+  
+      "icon": {
+        "size_sm": "16px",
+        "size_md": "20px",
+        "size_lg": "28px",
+        "style": "Rounded stroke icons, weight ~1.5px stroke. Monochrome within context.",
+        "wrapper_shape": "circle or rounded square",
+        "wrapper_bg_on_white_card": "#F0FDF4",
+        "wrapper_bg_on_dark_card": "rgba(255,255,255,0.12)"
+      },
+  
+      "motion": {
+        "duration_fast": "150ms",
+        "duration_default": "250ms",
+        "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "usage": "Hover lift on cards, badge count updates, chart bar entry"
+      }
+    },
+  
+    "components": {
+  
+      "card_base": {
+        "description": "The universal wrapper for every dashboard tile",
+        "variants": ["dark", "white", "green", "purple"],
+        "structure": {
+          "container": {
+            "border_radius": "var(--radius-card)",
+            "padding": "var(--card-padding)",
+            "box_shadow": "var(--shadow-card-default)",
+            "overflow": "hidden"
+          },
+          "header": {
+            "layout": "flex row, space-between, align-center",
+            "children": ["card_title", "card_action_or_badge"]
+          },
+          "body": {
+            "layout": "flex column, gap: var(--spacing-md)"
+          }
+        },
+        "dark_variant": {
+          "background": "color.background.card_dark",
+          "title_color": "color.text.primary_on_dark",
+          "body_text_color": "rgba(255,255,255,0.6)"
+        },
+        "white_variant": {
+          "background": "color.background.card_white",
+          "title_color": "color.text.primary_on_light",
+          "body_text_color": "color.text.secondary_on_light"
+        },
+        "green_variant": {
+          "background": "color.background.card_green",
+          "title_color": "color.text.data_large_on_green",
+          "body_text_color": "rgba(0,0,0,0.6)"
+        },
+        "purple_variant": {
+          "background": "color.background.card_purple",
+          "title_color": "color.text.data_large_on_purple",
+          "body_text_color": "rgba(255,255,255,0.75)"
+        }
+      },
+  
+      "metric_display": {
+        "description": "Large number + optional label. The hero element of any data card.",
+        "structure": {
+          "label": {
+            "typography": "typography.scale.label",
+            "color": "secondary",
+            "position": "above or below the number"
+          },
+          "value": {
+            "typography": "typography.scale.display_xl",
+            "color": "primary (inherits from card variant)"
+          },
+          "suffix": {
+            "note": "Currency symbol or unit appended inline, same size or slightly smaller"
+          }
+        }
+      },
+  
+      "badge_pill": {
+        "description": "Small inline label — used for filter state (Monthly), delta % (+28.21%)",
+        "structure": {
+          "padding": "4px 12px",
+          "border_radius": "var(--radius-button)",
+          "typography": "typography.scale.tag",
+          "background_on_dark": "rgba(255,255,255,0.12)",
+          "background_on_light": "#F3F4F6",
+          "positive_bg": "#DCFCE7",
+          "positive_text": "#16A34A"
+        },
+        "variants": ["default", "positive", "negative", "dropdown"]
+      },
+  
+      "icon_button": {
+        "description": "Circle or rounded square button with a single icon. Navigation, actions.",
+        "structure": {
+          "size": "36px × 36px",
+          "border_radius": "50%",
+          "background_on_green_card": "rgba(255,255,255,0.5)",
+          "background_on_white_card": "#F3F4F6",
+          "icon_color": "color.text.primary_on_light",
+          "icon_size": "var(--icon-size-md)"
+        }
+      },
+  
+      "avatar": {
+        "description": "User avatar — circular, with optional overlap (stacked avatars)",
+        "size_sm": "28px",
+        "size_md": "36px",
+        "border_radius": "50%",
+        "border": "2px solid #FFFFFF",
+        "overlap_offset": "-8px",
+        "note": "Two avatars overlap using negative margin-left"
+      },
+  
+      "transaction_row": {
+        "description": "Single row in a transaction list. Icon + title/subtitle on left, value on right.",
+        "structure": {
+          "layout": "flex row, align-center, gap: var(--spacing-md)",
+          "icon_wrapper": "components.icon.wrapper — 40px circle",
+          "text_group": {
+            "title": "typography.scale.heading",
+            "subtitle": "typography.scale.label"
+          },
+          "value_group": {
+            "amount": "typography.scale.heading, font-variant-numeric: tabular-nums",
+            "currency": "typography.scale.label"
+          },
+          "kebab_menu": {
+            "icon": "three-dot vertical",
+            "color": "color.text.secondary_on_light"
+          }
+        },
+        "divider": "none — row separation by padding only"
+      },
+  
+      "bar_chart": {
+        "description": "Grouped vertical bars. Simple, no axes shown, labels above columns.",
+        "structure": {
+          "bar_width": "~28px",
+          "bar_radius": "8px 8px 0 0",
+          "gap_between_bars": "4px",
+          "gap_between_groups": "16px",
+          "group_label": {
+            "typography": "typography.scale.label",
+            "position": "above bar group",
+            "color": "color.text.secondary_on_light"
+          },
+          "bar_colors": ["color.chart.bar_primary", "color.chart.bar_secondary"],
+          "max_height": "~80px",
+          "background": "transparent"
+        },
+        "notes": "Bars are stacked or grouped in pairs. No grid lines. Labels only on groups."
+      },
+  
+      "gauge_chart": {
+        "description": "Semicircular arc gauge. Used for balance / score visualization.",
+        "structure": {
+          "arc_thickness": "14px",
+          "arc_track_color": "color.chart.gauge_track",
+          "arc_filled_color": "color.chart.gauge_filled",
+          "arc_radius": "~70px",
+          "center_label": {
+            "value": "typography.scale.display_xl",
+            "unit": "typography.scale.label"
+          },
+          "position_dot": {
+            "size": "10px",
+            "color": "color.accent.dot_indicator",
+            "shape": "circle",
+            "note": "Marks the current value position on the arc"
+          },
+          "side_label": {
+            "position": "bottom-left of gauge",
+            "content": "percentage label + arrow icon"
+          }
+        }
+      },
+  
+      "area_chart": {
+        "description": "Smooth area chart — used for market cap sparkline inside purple card.",
+        "structure": {
+          "stroke_color": "#FFFFFF",
+          "stroke_width": "2px",
+          "fill_color": "rgba(255,255,255,0.2)",
+          "position_dot": {
+            "size": "8px",
+            "color": "color.accent.primary_green",
+            "border": "2px solid #FFFFFF"
+          },
+          "height": "~60px",
+          "x_axis": "hidden",
+          "y_axis": "hidden",
+          "grid": "none"
+        }
+      },
+  
+      "progress_bar": {
+        "description": "Horizontal progress indicator. Used for BTC price percentage target.",
+        "structure": {
+          "height": "10px",
+          "border_radius": "var(--radius-progress_bar)",
+          "track_color": "color.chart.progress_bar_bg",
+          "fill_color": "color.chart.progress_bar_fill",
+          "marker": {
+            "shape": "circle",
+            "size": "14px",
+            "color": "color.accent.secondary_purple",
+            "border": "2px solid #FFFFFF",
+            "position": "at fill endpoint"
+          }
+        }
+      },
+  
+      "timeline": {
+        "description": "Vertical timeline. Year + description pairs. Bullet dots indicate milestones.",
+        "structure": {
+          "layout": "flex column",
+          "connector": {
+            "type": "vertical line",
+            "color": "#D1D5DB",
+            "width": "1px",
+            "style": "dashed or solid"
+          },
+          "dot": {
+            "size_default": "8px",
+            "size_active": "12px",
+            "color_default": "#D1D5DB",
+            "color_active": "#111111",
+            "border_active": "3px solid #FFFFFF",
+            "shape": "circle"
+          },
+          "year_label": {
+            "typography": "typography.scale.timeline_year",
+            "color": "color.text.primary_on_light"
+          },
+          "description": {
+            "typography": "typography.scale.timeline_body",
+            "color": "color.text.secondary_on_light"
+          },
+          "row_gap": "20px"
+        }
+      },
+  
+      "sub_card": {
+        "description": "Smaller nested card within a parent card. Used for BTC price and market cap.",
+        "structure": {
+          "border_radius": "var(--radius-inner_card)",
+          "padding": "12px 16px",
+          "min_width": "140px"
+        },
+        "green_sub_card": {
+          "background": "color.background.card_green",
+          "header": "flex row, card label + external link icon (top-right arrow)"
+        },
+        "purple_sub_card": {
+          "background": "color.background.card_purple"
+        }
+      }
+    },
+  
+    "layout": {
+  
+      "grid": {
+        "type": "CSS Grid — responsive bento-style",
+        "columns": 2,
+        "rows": 2,
+        "gap": "16px",
+        "max_width": "900px",
+        "column_distribution": "roughly 50/50 or 40/60 depending on card content weight",
+        "pattern": "2×2 macro grid with internal sub-grids inside right column"
+      },
+  
+      "card_sizing": {
+        "large_card": {
+          "description": "Spans full column height",
+          "min_height": "260px",
+          "example": "Sales statistics (dark card), Current balance (green card)"
+        },
+        "medium_card": {
+          "description": "Stacked or side-by-side",
+          "min_height": "100px",
+          "example": "Recent Transactions, sub-metric cards"
+        },
+        "wide_card": {
+          "description": "Spans full row width",
+          "example": "Market forecast (white card spanning full right column)"
+        }
+      },
+  
+      "internal_card_layout": {
+        "header_row": "title left, action/badge right — always flex space-between",
+        "content_stack": "vertical flex column, loose gap (16–24px)",
+        "data_row": "metric value large + label small stacked vertically",
+        "chart_placement": "bottom or right of card, never overlapping text",
+        "avatar_row": "flex row, avatars overlap at top-right of card header"
+      },
+  
+      "right_column_layout": {
+        "description": "The right half of the grid is subdivided into 3 zones",
+        "zones": [
+          {
+            "zone": "top",
+            "content": "Recent Transactions card — white, 1 row tall"
+          },
+          {
+            "zone": "middle",
+            "content": "Market Forecast white card — spans left portion + 2 sub-cards stacked on right"
+          },
+          {
+            "zone": "sub_cards",
+            "layout": "vertical stack of 2 color-fill cards (green BTC price, purple market cap)"
+          }
+        ]
+      }
+    },
+  
+    "patterns": {
+  
+      "data_card_anatomy": {
+        "description": "Reusable pattern for any metric tile",
+        "slots": [
+          "card_type_variant (dark | white | green | purple)",
+          "header.left: title (string)",
+          "header.right: action_element (badge | icon_button | avatar_group | timestamp)",
+          "body.primary: metric_display (value + unit + label)",
+          "body.secondary: chart_or_list (optional)",
+          "body.tertiary: supporting_metric or cta (optional)"
+        ]
+      },
+  
+      "color_card_hierarchy": {
+        "description": "Card color communicates data priority and category",
+        "rules": [
+          "Dark card = primary KPI / main stat — highest visual weight",
+          "Green card = positive / growth / balance — energy and action",
+          "Purple card = forecast / secondary value — softer, speculative",
+          "White card = structured data / lists / timelines — neutral container"
+        ]
+      },
+  
+      "number_formatting": {
+        "large_integers": "Comma-separated thousands (2,025 / 21,105)",
+        "currency": "Value then symbol inline (15,368$ or 21,105$)",
+        "currency_note": "Symbol follows number, not precedes — stylistic choice",
+        "abbreviations": "Trillions abbreviated inline (1,3trln$)",
+        "percentages": "Sign-prefixed with decimal ('+28,21%'), comma as decimal separator"
+      },
+  
+      "icon_usage": {
+        "action_icons": "External link arrow — top-right of sub-cards, signals drill-down",
+        "navigation_icons": "Left/right chevrons in pairs for pagination / time navigation",
+        "status_icons": "Small colored dot or arrow for trend direction"
+      },
+  
+      "interactive_states": {
+        "hover_card": "Slight lift — transform: translateY(-2px), shadow deepens",
+        "active_button": "Background darkens 10%, scale: 0.97",
+        "selected_period": "Badge background fills to accent green"
+      }
+    },
+  
+    "cursor_implementation_notes": {
+      "css_variables": {
+        "description": "Map all tokens to CSS custom properties at :root",
+        "example_variables": [
+          "--color-bg-page: #D8E5DB",
+          "--color-card-dark: #1C1C1E",
+          "--color-card-green: #7EE8A2",
+          "--color-card-purple: #A78BFA",
+          "--color-text-primary: #111111",
+          "--color-text-secondary: #6B7280",
+          "--color-accent-green: #7EE8A2",
+          "--color-accent-purple: #A78BFA",
+          "--radius-card: 24px",
+          "--radius-button: 20px",
+          "--radius-inner: 16px",
+          "--shadow-card: 0 4px 24px rgba(0,0,0,0.08)",
+          "--spacing-card-pad: 20px 24px",
+          "--font-primary: 'Inter', system-ui, sans-serif"
+        ]
+      },
+  
+      "component_naming_convention": {
+        "cards": "DashCard, DashCard--dark, DashCard--green, DashCard--purple",
+        "metrics": "MetricDisplay, MetricDisplay__value, MetricDisplay__label",
+        "badges": "Badge, Badge--positive, Badge--dropdown",
+        "charts": "BarChart, GaugeChart, AreaChart, ProgressBar",
+        "layout": "BentoGrid, BentoGrid__cell, BentoGrid__cell--span2"
+      },
+  
+      "replication_checklist": [
+        "Set global background to sage (#D8E5DB) — this is load-bearing to the aesthetic",
+        "All cards must have 24px border radius — no exceptions",
+        "Numbers use tabular-nums and negative letter-spacing for density",
+        "Charts are decorative and low-detail — no axes, labels only where essential",
+        "Never mix card color variants in a single column — alternate dark/white or color/white",
+        "Sub-cards inside a white card use the color variants (green/purple) — not more white",
+        "Avatar groups use negative margin overlap, 2px white border ring",
+        "Spacing inside cards is generous — do not compress padding below 16px"
+      ]
+    }
+  }
