@@ -18,6 +18,7 @@
     <hr class="horizontal dark mt-0">
     <div class="collapse navbar-collapse w-auto h-100" id="sidenav-collapse-main">
         <ul class="navbar-nav">
+            @can('dashboard.view')
             <li class="nav-item pb-2">
                 <a class="nav-link {{ Route::currentRouteName() == 'dashboard' ? 'active' : '' }}"
                     href="{{ route('dashboard', ['company_id' => request()->session()->get('companyId')]) }}">
@@ -46,9 +47,13 @@
                     <span class="nav-link-text ms-1">Dashboard</span>
                 </a>
             </li>
+            @endcan
+            @canany(['employees.create', 'employees.edit', 'employees.view', 'attendance.view', 'attendance.manage'])
             <li class="nav-item mt-2">
                 <h6 class="ps-4 ms-2 text-uppercase text-xs font-weight-bolder opacity-6">Employee Operations</h6>
             </li>
+            @endcanany
+            @canany(['employees.create', 'employees.edit'])
             <li class="nav-item">
                 <a class="nav-link {{ Route::currentRouteName() == 'add-employee-details' ? 'active' : '' }}"
                     href="{{ route('add-employee-details', ['company_id' => request()->session()->get('companyId')]) }}">
@@ -80,6 +85,8 @@
                     <span class="nav-link-text ms-1">Add Employee Details</span>
                 </a>
             </li>
+            @endcanany
+            @can('employees.view')
             <li class="nav-item">
                 <a class="nav-link {{ Route::currentRouteName() == 'view-employee-details' ? 'active' : '' }}"
                     href="{{ route('view-employee-details', ['company_id' => request()->session()->get('companyId')]) }}">
@@ -111,7 +118,9 @@
                     <span class="nav-link-text ms-1">View Employee Details</span>
                 </a>
             </li>
+            @endcan
 
+            @canany(['attendance.view', 'attendance.manage'])
             <li class="nav-item">
                 <a class="nav-link {{ Route::currentRouteName() == 'attendance-entry' ? 'active' : '' }}"
                     href="{{ route('attendance-entry', ['company_id' => request()->session()->get('companyId')]) }}">
@@ -144,9 +153,13 @@
                     <span class="nav-link-text ms-1">Add Attendance Details</span>
                 </a>
             </li>
+            @endcanany
+            @canany(['compensation.view', 'salary.generate'])
             <li class="nav-item mt-2">
                 <h6 class="ps-4 ms-2 text-uppercase text-xs font-weight-bolder opacity-6">Salary Operations</h6>
             </li>
+            @endcanany
+            @can('compensation.view')
             <li class="nav-item">
                 <a class="nav-link {{ in_array(Route::currentRouteName(), ['compensation', 'compensation-structures']) ? 'active' : '' }}"
                     href="{{ route('compensation', ['company_id' => request()->session()->get('companyId')]) }}">
@@ -179,6 +192,8 @@
                     <span class="nav-link-text ms-1">Compensation</span>
                 </a>
             </li>
+            @endcan
+            @can('salary.generate')
             <li class="nav-item">
                 <a class="nav-link {{ in_array(Route::currentRouteName(), ['salary-generator', 'payroll-run-detail', 'employee-payroll-detail']) ? 'active' : '' }}"
                     href="{{ route('salary-generator', ['company_id' => request()->session()->get('companyId')]) }}">
@@ -223,6 +238,7 @@
                     <span class="nav-link-text ms-1">Payroll History</span>
                 </a>
             </li>
+            @endcan
 
             {{-- <li class="nav-item mt-2">
                 <h6 class="ps-4 ms-2 text-uppercase text-xs font-weight-bolder opacity-6">Laravel Examples</h6>

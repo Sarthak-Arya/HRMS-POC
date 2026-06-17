@@ -76,21 +76,18 @@ class EmployeeTemplateController extends Controller
 
             // Add headers to the first row
             $column = 'A';
-            foreach ($headers as $key => $header) {
+            foreach ($headers as $header) {
                 $sheet->setCellValue($column . '1', $header);
+                $sheet->getColumnDimension($column)->setAutoSize(true);
                 $column++;
             }
+            $column--;
 
             // Style the header row
             $headerRange = 'A1:' . $column . '1';
             $sheet->getStyle($headerRange)->getFont()->setBold(true);
             $sheet->getStyle($headerRange)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID);
             $sheet->getStyle($headerRange)->getFill()->getStartColor()->setRGB('E2E8F0');
-
-            // Auto-size columns
-            foreach (range('A', $column) as $col) {
-                $sheet->getColumnDimension($col)->setAutoSize(true);
-            }
 
             // Add some sample data in row 2 for guidance
             $sampleData = [
@@ -137,10 +134,11 @@ class EmployeeTemplateController extends Controller
             ];
 
             $column = 'A';
-            foreach ($sampleData as $index => $value) {
+            foreach ($sampleData as $value) {
                 $sheet->setCellValue($column . '2', $value);
                 $column++;
             }
+            $column--;
 
             // Style sample data row
             $sampleRange = 'A2:' . $column . '2';

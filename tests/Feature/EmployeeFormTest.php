@@ -6,6 +6,7 @@ use App\Http\Livewire\AddEmployeeDetails;
 use App\Models\Company;
 use App\Models\Department;
 use App\Models\Designation;
+use App\Models\Location;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -15,156 +16,125 @@ class EmployeeFormTest extends TestCase
 {
     use RefreshDatabase;
 
+    private User $user;
+
+    private Company $company;
+
     protected function setUp(): void
     {
         parent::setUp();
-        
-        // Create a test user and authenticate
-        $user = User::factory()->create();
-        $this->actingAs($user);
 
-        // Create a test company
-        $this->company = Company::factory()->create();
-        session()->put('companyIdNum', $this->company->id);
+        $this->user = User::factory()->hrManager()->create();
+        $this->company = Company::factory()->create(['company_handled_by' => $this->user->id]);
+        $this->actingAs($this->user);
     }
 
-    /** @test */
-    public function it_can_create_an_employee_with_required_fields_only()
+    private function employeeForm(): \Livewire\Testing\TestableLivewire
     {
-        // Create required department and designation
+        return Livewire::test(AddEmployeeDetails::class, [
+            'company_id' => (string) $this->company->id,
+        ]);
+    }
+
+    public function test_it_can_create_an_employee_with_required_fields_only(): void
+    {
         $department = Department::factory()->create(['company_id' => $this->company->id]);
         $designation = Designation::factory()->create(['company_id' => $this->company->id]);
+        $location = Location::factory()->create(['company_id' => $this->company->id]);
 
-        // Test data with required fields only
-        $testData = [
-            'firstName' => 'John',
-            'lastName' => 'Doe',
-            'fatherName' => 'John Doe Sr',
-            'gender' => 'male',
-            'dob' => '1990-01-01',
-            'department' => $department->id,
-            'designation' => $designation->id,
-        ];
-
-        // Test the Livewire component
-        Livewire::test(AddEmployeeDetails::class)
-            ->set('firstName', $testData['firstName'])
-            ->set('lastName', $testData['lastName'])
-            ->set('fatherName', $testData['fatherName'])
-            ->set('gender', $testData['gender'])
-            ->set('dob', $testData['dob'])
-            ->set('department', $testData['department'])
-            ->set('designation', $testData['designation'])
+        $this->employeeForm()
+            ->set('firstName', 'John')
+            ->set('lastName', 'Doe')
+            ->set('fatherName', 'John Doe Sr')
+            ->set('gender', 'male')
+            ->set('dob', '1990-01-01')
+            ->set('department', $department->department_name)
+            ->set('designation', $designation->designation_name)
+            ->set('location', $location->location_name)
+            ->set('employeeCompanyCode', 'EMP001')
             ->call('save')
             ->assertHasNoErrors();
 
-        // Assert the employee was created in the database with required fields
         $this->assertDatabaseHas('employees', [
-            'employee_first_name' => $testData['firstName'],
-            'employee_last_name' => $testData['lastName'],
-            'employee_father_name' => $testData['fatherName'],
-            'employee_gender' => $testData['gender'],
-            'employee_dob' => $testData['dob'],
-            'department_id' => $testData['department'],
-            'designation_id' => $testData['designation'],
+            'employee_name' => 'John Doe',
+            'father_name' => 'John Doe Sr',
+            'gender' => 'M',
+            'employee_code' => 'EMP001',
+            'department_id' => $department->id,
+            'designation_id' => $designation->id,
+            'location_id' => $location->id,
             'company_id' => $this->company->id,
         ]);
     }
 
-    /** @test */
-    public function it_can_create_an_employee_with_all_fields()
+    public function test_it_can_create_an_employee_with_all_fields(): void
     {
-        // Create required department and designation
         $department = Department::factory()->create(['company_id' => $this->company->id]);
         $designation = Designation::factory()->create(['company_id' => $this->company->id]);
+        $location = Location::factory()->create(['company_id' => $this->company->id]);
 
-        // Test data with all fields
-        $testData = [
-            'firstName' => 'John',
-            'middleName' => 'William',
-            'lastName' => 'Doe',
-            'fatherName' => 'John Doe Sr',
-            'gender' => 'male',
-            'dob' => '1990-01-01',
-            'department' => $department->id,
-            'designation' => $designation->id,
-            'employeeCompanyCode' => 'EMP001',
-            'joiningDate' => '2023-01-01',
-            'leavingDate' => null,
-            'esiNo' => 'ESI123456',
-            'pfNo' => 'PF123456',
-            'accountNo' => '1234567890',
-            'bankName' => 'Test Bank',
-            'ifscCode' => 'TEST123456',
-        ];
-
-        // Test the Livewire component
-        Livewire::test(AddEmployeeDetails::class)
-            ->set('firstName', $testData['firstName'])
-            ->set('middleName', $testData['middleName'])
-            ->set('lastName', $testData['lastName'])
-            ->set('fatherName', $testData['fatherName'])
-            ->set('gender', $testData['gender'])
-            ->set('dob', $testData['dob'])
-            ->set('department', $testData['department'])
-            ->set('designation', $testData['designation'])
-            ->set('employeeCompanyCode', $testData['employeeCompanyCode'])
-            ->set('joiningDate', $testData['joiningDate'])
-            ->set('leavingDate', $testData['leavingDate'])
-            ->set('esiNo', $testData['esiNo'])
-            ->set('pfNo', $testData['pfNo'])
-            ->set('accountNo', $testData['accountNo'])
-            ->set('bankName', $testData['bankName'])
-            ->set('ifscCode', $testData['ifscCode'])
+        $this->employeeForm()
+            ->set('firstName', 'John')
+            ->set('middleName', 'William')
+            ->set('lastName', 'Doe')
+            ->set('fatherName', 'John Doe Sr')
+            ->set('gender', 'male')
+            ->set('dob', '1990-01-01')
+            ->set('department', $department->department_name)
+            ->set('designation', $designation->designation_name)
+            ->set('location', $location->location_name)
+            ->set('employeeCompanyCode', 'EMP002')
+            ->set('joiningDate', '2023-01-01')
+            ->set('esiNo', 'ESI123456')
+            ->set('pfNo', 'PF123456')
+            ->set('accountNo', '1234567890')
+            ->set('bankName', 'Test Bank')
+            ->set('ifscCode', 'TEST123456')
             ->call('save')
             ->assertHasNoErrors();
 
-        // Assert the employee was created in the database with all fields
         $this->assertDatabaseHas('employees', [
-            'employee_first_name' => $testData['firstName'],
-            'employee_middle_name' => $testData['middleName'],
-            'employee_last_name' => $testData['lastName'],
-            'employee_father_name' => $testData['fatherName'],
-            'employee_gender' => $testData['gender'],
-            'employee_dob' => $testData['dob'],
-            'department_id' => $testData['department'],
-            'designation_id' => $testData['designation'],
-            'employee_company_code' => $testData['employeeCompanyCode'],
-            'employee_joining_date' => $testData['joiningDate'],
-            'employee_leaving_date' => $testData['leavingDate'],
-            'employee_esi_no' => $testData['esiNo'],
-            'employee_pf_no' => $testData['pfNo'],
+            'employee_name' => 'John William Doe',
+            'father_name' => 'John Doe Sr',
+            'gender' => 'M',
+            'employee_code' => 'EMP002',
+            'doj' => '2023-01-01',
+            'esi_no' => 'ESI123456',
+            'pf_no' => 'PF123456',
+            'bank_name' => 'Test Bank',
+            'bank_account_no' => '1234567890',
+            'bank_ifsc_code' => 'TEST123456',
             'company_id' => $this->company->id,
         ]);
     }
 
-    /** @test */
-    public function it_validates_required_fields()
+    public function test_it_validates_required_fields(): void
     {
-        Livewire::test(AddEmployeeDetails::class)
+        $this->employeeForm()
             ->set('firstName', '')
             ->set('lastName', '')
             ->set('fatherName', '')
             ->set('gender', '')
-            ->set('dob', '')
             ->set('department', '')
             ->set('designation', '')
+            ->set('location', '')
+            ->set('employeeCompanyCode', '')
             ->call('save')
             ->assertHasErrors([
                 'firstName' => 'required',
                 'lastName' => 'required',
                 'fatherName' => 'required',
                 'gender' => 'required',
-                'dob' => 'required',
                 'department' => 'required',
                 'designation' => 'required',
+                'location' => 'required',
+                'employeeCompanyCode' => 'required',
             ]);
     }
 
-    /** @test */
-    public function it_validates_date_format()
+    public function test_it_validates_date_format(): void
     {
-        Livewire::test(AddEmployeeDetails::class)
+        $this->employeeForm()
             ->set('dob', 'invalid-date')
             ->set('joiningDate', 'invalid-date')
             ->call('save')
@@ -174,21 +144,67 @@ class EmployeeFormTest extends TestCase
             ]);
     }
 
-    /** @test */
-    public function it_validates_department_exists()
+    public function test_it_creates_missing_department_and_designation_names(): void
     {
-        Livewire::test(AddEmployeeDetails::class)
-            ->set('department', 999) // Non-existent department
+        $location = Location::factory()->create(['company_id' => $this->company->id]);
+
+        $this->employeeForm()
+            ->set('firstName', 'Jane')
+            ->set('lastName', 'Smith')
+            ->set('fatherName', 'Jane Smith Sr')
+            ->set('gender', 'female')
+            ->set('department', 'New Department')
+            ->set('designation', 'New Designation')
+            ->set('location', $location->location_name)
+            ->set('employeeCompanyCode', 'EMP003')
             ->call('save')
-            ->assertHasErrors(['department' => 'exists']);
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('departments', [
+            'company_id' => $this->company->id,
+            'department_name' => 'New Department',
+        ]);
+
+        $this->assertDatabaseHas('designations', [
+            'company_id' => $this->company->id,
+            'designation_name' => 'New Designation',
+        ]);
+
+        $this->assertDatabaseHas('employees', [
+            'employee_code' => 'EMP003',
+            'employee_name' => 'Jane Smith',
+            'company_id' => $this->company->id,
+        ]);
     }
 
-    /** @test */
-    public function it_validates_designation_exists()
+    public function test_it_rejects_duplicate_employee_code(): void
     {
-        Livewire::test(AddEmployeeDetails::class)
-            ->set('designation', 999) // Non-existent designation
+        $department = Department::factory()->create(['company_id' => $this->company->id]);
+        $designation = Designation::factory()->create(['company_id' => $this->company->id]);
+        $location = Location::factory()->create(['company_id' => $this->company->id]);
+
+        $this->employeeForm()
+            ->set('firstName', 'John')
+            ->set('lastName', 'Doe')
+            ->set('fatherName', 'John Doe Sr')
+            ->set('gender', 'male')
+            ->set('department', $department->department_name)
+            ->set('designation', $designation->designation_name)
+            ->set('location', $location->location_name)
+            ->set('employeeCompanyCode', 'EMP-DUP')
             ->call('save')
-            ->assertHasErrors(['designation' => 'exists']);
+            ->assertHasNoErrors();
+
+        $this->employeeForm()
+            ->set('firstName', 'Jane')
+            ->set('lastName', 'Doe')
+            ->set('fatherName', 'Jane Doe Sr')
+            ->set('gender', 'female')
+            ->set('department', $department->department_name)
+            ->set('designation', $designation->designation_name)
+            ->set('location', $location->location_name)
+            ->set('employeeCompanyCode', 'EMP-DUP')
+            ->call('save')
+            ->assertHasErrors(['employeeCompanyCode' => 'unique']);
     }
-} 
+}

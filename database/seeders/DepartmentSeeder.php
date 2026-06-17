@@ -21,7 +21,7 @@ class DepartmentSeeder extends Seeder
 
     public function run(): void
     {
-        Company::whereIn('company_handled_by', CompanySeeder::HANDLER_USER_IDS)
+        CompanySeeder::demoCompaniesQuery()
             ->each(function (Company $company) {
                 Location::where('company_id', $company->id)->each(function (Location $location) {
                     $departmentCount = random_int(3, 6);

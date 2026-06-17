@@ -34,9 +34,7 @@ class CompanyAccessMiddleware
             return redirect()->route('login')->with('error', 'Please log in to access this page.');
         }
 
-        $handledBy = $company['company_handled_by'];
-    
-        if ($user->id != $handledBy) {
+        if (!$user->canAccessCompany($company)) {
             abort(403, 'You do not have permission to access this company.');
         }
 

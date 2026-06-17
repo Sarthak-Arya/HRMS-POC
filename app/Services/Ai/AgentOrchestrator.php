@@ -5,6 +5,7 @@ namespace App\Services\Ai;
 use App\Models\AiConversation;
 use App\Models\AiMessage;
 use App\Models\Company;
+use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -186,6 +187,12 @@ You can manage employees using the available tools:
 - bulk_upsert_employees: create/update multiple employees at once
 - import_employees_excel: import from an uploaded Excel/CSV file
 
+You can manage monthly attendance using:
+- search_attendance: list attendance for a month/year (filter by employee or department)
+- get_attendance: fetch one employee's attendance for a month/year
+- upsert_attendance: add or update attendance for one employee
+- bulk_upsert_attendance: add or update attendance for multiple employees
+
 Field mapping (Hindi ↔ English):
 - कर्मचारी कोड / employee code
 - नाम / name, employee_name
@@ -194,13 +201,21 @@ Field mapping (Hindi ↔ English):
 - पद / designation
 - स्थान / location
 - पुरुष/male → M, महिला/female → F
+- हाजिरी / attendance
+- CL / casual leave (cl)
+- EL / earned leave (el)
+- SL / sick leave (sl)
+- अवकाश / holiday
+- कुल दिन / total days (tot_dys)
+- काम के दिन / worked days (auto-calculated)
 
 Rules:
-1. Always use tools to read or modify employee data — never invent database records.
-2. Confirm with the user before bulk_upsert_employees with more than 3 employees or before import_employees_excel unless the user explicitly asked to import.
-3. If required fields are missing, ask the user in their language.
+1. Always use tools to read or modify employee and attendance data — never invent database records.
+2. Confirm with the user before bulk_upsert_employees or bulk_upsert_attendance with more than 3 records, or before import_employees_excel unless the user explicitly asked to import.
+3. If required fields are missing (e.g. month, year, employee), ask the user in their language.
 4. After successful mutations, summarize what changed clearly.
 5. Employee codes: use what the user provides; otherwise the system auto-generates EMP* codes.
+6. For attendance, month (1-12) and year are always required. Use search_employees first if you need to resolve an employee by name.
 PROMPT;
     }
 
@@ -256,7 +271,8 @@ PROMPT;
             throw new RuntimeException('Company not found.');
         }
 
-        if ((int) $company->company_handled_by !== $userId) {
+        $user = User::find($userId);
+        if (!$user || !$user->canAccessCompany($company)) {
             throw new RuntimeException('You do not have permission to access this company.');
         }
     }
