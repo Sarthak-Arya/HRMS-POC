@@ -110,6 +110,22 @@
                                   </div>
                                   @error('password') <div class="text-danger">{{ $message }}</div> @enderror
                               </div>
+                              <div class="mb-3">
+                                  <label class="form-label text-sm text-secondary mb-1">{{ __('Your role') }}</label>
+                                  <div class="@error('role') border border-danger rounded-3 @enderror">
+                                      <select wire:model.live="role" class="form-control" aria-label="Role">
+                                          @foreach ($registerableRoles as $registerableRole)
+                                              <option value="{{ $registerableRole->name }}">
+                                                  {{ \App\Enums\UserRole::from($registerableRole->name)->label() }}
+                                              </option>
+                                          @endforeach
+                                      </select>
+                                  </div>
+                                  @if (!empty($roleDescriptions[$role] ?? null))
+                                      <p class="text-xs text-secondary mt-2 mb-0">{{ $roleDescriptions[$role] }}</p>
+                                  @endif
+                                  @error('role') <div class="text-danger">{{ $message }}</div> @enderror
+                              </div>
                               <div class="form-check form-check-info text-left">
                                   <input class="form-check-input" type="checkbox" value="" id="flexCheckDefault"
                                       checked>

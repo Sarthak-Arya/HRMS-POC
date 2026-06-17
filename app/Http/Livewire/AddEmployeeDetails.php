@@ -137,7 +137,7 @@ class AddEmployeeDetails extends Component
             'leavingDate' => ['nullable', 'date', 'after_or_equal:joiningDate'],
             'esiNo' => ['nullable', 'string', 'max:20'],
             'pfNo' => ['nullable', 'string', 'max:20'],
-            'account_no' => ['nullable', 'string', 'max:20'],
+            'accountNo' => ['nullable', 'string', 'max:20'],
             'bankName' => ['nullable', 'string', 'max:200'],
             'ifscCode' => ['nullable', 'string', 'max:20'],
         ];
@@ -256,9 +256,9 @@ class AddEmployeeDetails extends Component
      */
     public function mount(?string $company_id = null, ?string $employee_id = null)
     {
-        $this->companyId = $company_id ?? request()->session()->get('companyId', '');
+        $this->companyId = $company_id ?? (string) session('companyId', '');
         if ($this->companyId !== '') {
-            request()->session()->put('companyId', $this->companyId);
+            session(['companyId' => $this->companyId]);
         }
 
         $this->employeeId = $employee_id !== null ? (int) $employee_id : null;
@@ -467,7 +467,7 @@ class AddEmployeeDetails extends Component
         try {
             $query = Employee::query()
                 ->with(['department', 'designation', 'location'])  // Eager load the relationships
-                ->where('company_id', request()->session()->get('companyId'));
+                ->where('company_id', $this->companyId);
 
             if ($this->selectedDepartment) {
                 $query->where('department_id', $this->selectedDepartment);

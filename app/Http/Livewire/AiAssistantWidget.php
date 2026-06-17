@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire;
 
+use App\Models\AiConversation;
 use App\Services\Ai\AgentOrchestrator;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -20,6 +21,9 @@ class AiAssistantWidget extends Component
     /** @var bool Whether the assistant widget is open. */
     public bool $isOpen = false;
 
+    /** @var bool Whether the conversation history sidebar is visible (mobile overlay). */
+    public bool $showHistory = false;
+
     /** @var string The user's message input. */
     public string $input = '';
 
@@ -34,6 +38,9 @@ class AiAssistantWidget extends Component
 
     /** @var array<int, array{role: string, content: string}> The history of messages in the current session. */
     public array $messages = [];
+
+    /** @var string|null A short-lived status message shown in the widget UI. */
+    public ?string $statusMessage = null;
 
     /** @var \Livewire\TemporaryUploadedFile|null The uploaded Excel file, if any. */
     public $excelFile;
@@ -67,6 +74,16 @@ class AiAssistantWidget extends Component
     }
 
     /**
+     * Toggle the conversation history sidebar.
+     *
+     * @return void
+     */
+    public function toggleHistory(): void
+    {
+        $this->showHistory = !$this->showHistory;
+    }
+
+    /**
      * Send the user's message (and any uploaded file) to the AI orchestrator.
      *
      * @return void
@@ -85,6 +102,7 @@ class AiAssistantWidget extends Component
 
         $this->isProcessing = true;
         $this->errorMessage = null;
+        $this->statusMessage = null;
 
         $excelPath = null;
         if ($this->excelFile) {
@@ -144,6 +162,114 @@ class AiAssistantWidget extends Component
         $this->messages = [];
         $this->errorMessage = null;
         $this->input = '';
+        $this->isProcessing = false;
+        $this->excelFile = null;
+        $this->statusMessage = 'New conversation started.';
+
+        $this->dispatchBrowserEvent('ai-conversation-reset');
+    }
+
+    /**
+     * Load an existing conversation from the database.
+     *
+     * @param int $conversationId
+     * @return void
+     */
+    public function loadConversation(int $conversationId): void
+    {
+        if (!$this->companyId) {
+            return;
+        }
+
+        $conversation = AiConversation::query()
+            ->where('company_id', $this->companyId)
+            ->where('user_id', auth()->id())
+            ->findOrFail($conversationId);
+
+        $this->conversationId = $conversation->id;
+        $this->messages = $conversation->messages()
+            ->whereIn('role', ['user', 'assistant'])
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($message) => [
+                'role' => $message->role,
+                'content' => (string) ($message->content ?? ''),
+            ])
+            ->filter(fn (array $message) => $message['content'] !== '')
+            ->values()
+            ->all();
+
+        $this->errorMessage = null;
+        $this->input = '';
+        $this->isProcessing = false;
+        $this->excelFile = null;
+        $this->statusMessage = null;
+        $this->showHistory = false;
+
+        $this->dispatchBrowserEvent('ai-conversation-loaded');
+    }
+
+    /**
+     * Delete a saved conversation.
+     *
+     * @param int $conversationId
+     * @return void
+     */
+    public function deleteConversation(int $conversationId): void
+    {
+        if (!$this->companyId) {
+            return;
+        }
+
+        $conversation = AiConversation::query()
+            ->where('company_id', $this->companyId)
+            ->where('user_id', auth()->id())
+            ->findOrFail($conversationId);
+
+        $wasActive = $this->conversationId === $conversation->id;
+        $conversation->delete();
+
+        if ($wasActive) {
+            $this->conversationId = null;
+            $this->messages = [];
+            $this->input = '';
+            $this->errorMessage = null;
+            $this->statusMessage = null;
+            $this->dispatchBrowserEvent('ai-conversation-reset');
+        }
+    }
+
+    /**
+     * Clear the transient status banner from the widget.
+     *
+     * @return void
+     */
+    public function clearStatusMessage(): void
+    {
+        $this->statusMessage = null;
+    }
+
+    /**
+     * @return array<int, array{id: int, title: string, updated_at: string}>
+     */
+    private function getConversations(): array
+    {
+        if (!$this->companyId || !auth()->check()) {
+            return [];
+        }
+
+        return AiConversation::query()
+            ->where('company_id', $this->companyId)
+            ->where('user_id', auth()->id())
+            ->orderByDesc('updated_at')
+            ->limit(50)
+            ->get()
+            ->map(fn (AiConversation $conversation) => [
+                'id' => $conversation->id,
+                'title' => $conversation->title ?: 'New chat',
+                'updated_at' => $conversation->updated_at?->diffForHumans() ?? '',
+            ])
+            ->all();
     }
 
     /**
@@ -153,7 +279,8 @@ class AiAssistantWidget extends Component
      */
     public function render()
     {
-        return view('livewire.ai-assistant-widget');
+        return view('livewire.ai-assistant-widget', [
+            'conversations' => $this->getConversations(),
+        ]);
     }
 }
-

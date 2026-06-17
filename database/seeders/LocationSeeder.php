@@ -17,7 +17,7 @@ class LocationSeeder extends Seeder
             ['city' => 'Hyderabad', 'state' => 'Telangana', 'pincode' => '500001'],
         ];
 
-        Company::whereIn('company_handled_by', CompanySeeder::HANDLER_USER_IDS)
+        CompanySeeder::demoCompaniesQuery()
             ->each(function (Company $company) use ($cities) {
                 $locationCount = random_int(1, 4);
                 $companySlug = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $company->company_name), 0, 3));

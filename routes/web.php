@@ -58,31 +58,48 @@ Route::middleware('auth')->group(function () {
     Route::get('/billing', Billing::class)->name('billing');
     Route::get('/profile', Profile::class)->name('profile');
     Route::get('/laravel-user-profile', UserProfile::class)->name('user-profile');
-    Route::get('/laravel-user-management', UserManagement::class)->name('user-management');
-    Route::get('/add-company-details', AddCompanyDetails::class)->name('add-company-details');
-    Route::get('/view-companies', ViewCompanies::class)->name('view-companies');
-    Route::post('/import-excel', [App\Http\Controllers\ImportExcel::class, 'import'])->name('import.excel');
-    
-    // Employee template download route
-    Route::get('/download-employee-template', [App\Http\Controllers\EmployeeTemplateController::class, 'downloadTemplate'])->name('download.template');
+    Route::middleware('permission:users.manage')->group(function () {
+        Route::get('/laravel-user-management', UserManagement::class)->name('user-management');
+    });
+    Route::middleware('permission:companies.create')->group(function () {
+        Route::get('/add-company-details', AddCompanyDetails::class)->name('add-company-details');
+    });
+    Route::middleware('permission:companies.view')->group(function () {
+        Route::get('/view-companies', ViewCompanies::class)->name('view-companies');
+    });
+    Route::middleware('permission:employees.import')->group(function () {
+        Route::post('/import-excel', [App\Http\Controllers\ImportExcel::class, 'import'])->name('import.excel');
+        Route::get('/download-employee-template', [App\Http\Controllers\EmployeeTemplateController::class, 'downloadTemplate'])->name('download.template');
+    });
 
     Route::prefix('{company_id}')->group(function () {
-        Route::middleware(CompanyAccessMiddleware::class)->group(function () {
-            Route::get('/add-employee-details', action: AddEmployeeDetails::class)->name('add-employee-details');
-            Route::post('/add-employee-details', action: AddEmployeeDetails::class)->name('add-employee-details');
-            Route::get('/edit-employee-details/{employee_id}', action: AddEmployeeDetails::class)->name('edit-employee-details');
-            Route::get('/dashboard', action: Dashboard::class)->name('dashboard');
-            Route::get('/compensation', action: CompensationHub::class)->name('compensation');
-            Route::get('/compensation-structures', function (string $company_id) {
-                return redirect()->route('compensation', ['company_id' => $company_id]);
-            })->name('compensation-structures');
-            Route::get('/employee-compensation/{employee_id}', action: EmployeeCompensation::class)->name('employee-compensation');
-            Route::get('/salary-generator', action: SalaryGenerator::class)->name('salary-generator');
-            Route::get('/view-employee-details', action: EmployeeList::class)->name('view-employee-details');
-            Route::get('/view-employee-details/{employee_id}', action: ViewEmployeeDetails::class)->name('employee-details');
-            Route::get('/attendance-entry', AttendanceEntry::class)->name('attendance-entry');
+        Route::middleware([CompanyAccessMiddleware::class])->group(function () {
+            Route::middleware('permission:dashboard.view')->group(function () {
+                Route::get('/dashboard', action: Dashboard::class)->name('dashboard');
+            });
+            Route::middleware('permission:employees.create,employees.edit')->group(function () {
+                Route::get('/add-employee-details', action: AddEmployeeDetails::class)->name('add-employee-details');
+                Route::post('/add-employee-details', action: AddEmployeeDetails::class)->name('add-employee-details');
+                Route::get('/edit-employee-details/{employee_id}', action: AddEmployeeDetails::class)->name('edit-employee-details');
+            });
+            Route::middleware('permission:compensation.view')->group(function () {
+                Route::get('/compensation', action: CompensationHub::class)->name('compensation');
+                Route::get('/compensation-structures', function (string $company_id) {
+                    return redirect()->route('compensation', ['company_id' => $company_id]);
+                })->name('compensation-structures');
+                Route::get('/employee-compensation/{employee_id}', action: EmployeeCompensation::class)->name('employee-compensation');
+            });
+            Route::middleware('permission:salary.generate')->group(function () {
+                Route::get('/salary-generator', action: SalaryGenerator::class)->name('salary-generator');
+            });
+            Route::middleware('permission:employees.view')->group(function () {
+                Route::get('/view-employee-details', action: EmployeeList::class)->name('view-employee-details');
+                Route::get('/view-employee-details/{employee_id}', action: ViewEmployeeDetails::class)->name('employee-details');
+            });
+            Route::middleware('permission:attendance.view,attendance.manage')->group(function () {
+                Route::get('/attendance-entry', AttendanceEntry::class)->name('attendance-entry');
+            });
         });
-        
     });
 
     Route::get('/tables', action: Tables::class)->name('tables');

@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Auth;
 
+use App\Services\Auth\UserRoleService;
 use Livewire\Component;
 use App\Models\User;
 
@@ -12,7 +13,7 @@ class Login extends Component
     public $remember_me = false;
 
     protected $rules = [
-        'email' => 'required|email:rfc,dns',
+        'email' => 'required|email',
         'password' => 'required',
     ];
 
@@ -26,9 +27,9 @@ class Login extends Component
     public function login() {
         $credentials = $this->validate();
         if(auth()->attempt(['email' => $this->email, 'password' => $this->password], $this->remember_me)) {
-            $user = User::where(["email" => $this->email])->first();
-            auth()->login($user, $this->remember_me);
-            return redirect()->intended('/view-companies');        
+            $user = User::where(['email' => $this->email])->first();
+            auth()->login(UserRoleService::ensureDefaultRole($user), $this->remember_me);
+            return redirect()->intended(route('view-companies'));
         }
         else{
             return $this->addError('email', trans('auth.failed')); 

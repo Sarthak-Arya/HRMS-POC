@@ -20,7 +20,6 @@
                     @include('layouts.footers.auth.footer')
                 </div>
             </div>
-            @include('components.plugins.fixed-plugin')
         @elseif (in_array(request()->route()->getName(), ['view-companies', 'add-company-details']))
             @include('layouts.navbars.auth.nav')
             {{ $slot }}
@@ -34,7 +33,6 @@
         @else
             @include('layouts.navbars.auth.sidebar')
             @include('layouts.navbars.auth.nav')
-            @include('components.plugins.fixed-plugin')
             {{ $slot }}
             <main>
                 <div class="container-fluid">
@@ -47,7 +45,9 @@
                 $widgetCompanyId = request()->route('company_id') ?? session('companyId');
             @endphp
             @if($widgetCompanyId)
-                @livewire('ai-assistant-widget', ['company_id' => $widgetCompanyId], key('ai-widget-' . $widgetCompanyId))
+                @can('ai.assistant.use')
+                    @livewire('ai-assistant-widget', ['company_id' => $widgetCompanyId], key('ai-widget-' . $widgetCompanyId))
+                @endcan
             @endif
         @endif
     @endauth

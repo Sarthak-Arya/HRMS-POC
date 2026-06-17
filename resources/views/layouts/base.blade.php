@@ -30,21 +30,18 @@
     <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
     @livewireStyles
     <style>
+  html, body {
+    overflow-x: hidden;
+  }
+
   .main-content {
-    margin-left: 0;
-    width: 100%;
-    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-width: 100%;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  body.g-sidenav-pinned {
-    margin-left: 15.625rem;
-    width: calc(100% - 15.625rem);
-    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  body:not(.g-sidenav-pinned) .main-content {
-    margin-left: 0;
-    width: 100%;
-    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* When sidebar is collapsed, remove the Soft UI left offset on smaller screens. */
+  body:not(.g-sidenav-pinned) .sidenav.fixed-start ~ .main-content {
+    margin-left: 0 !important;
   }
 
   /* Theme: dark */

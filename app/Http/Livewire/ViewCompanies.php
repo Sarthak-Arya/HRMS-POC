@@ -25,7 +25,9 @@ class ViewCompanies extends Component
     public function mount(){
         $this->authData = Auth::user();
         $this->userId = $this->authData['id'];
-        $this->companies = Company::where('company_handled_by', $this->userId)->get();
+        $this->companies = $this->authData->isAdmin()
+            ? Company::query()->orderBy('company_name')->get()
+            : Company::where('company_handled_by', $this->userId)->get();
         $this->searchedCompanies = $this->companies;
         $this->rows = $this->companies->count()/3;
     }

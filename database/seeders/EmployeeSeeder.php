@@ -24,7 +24,7 @@ class EmployeeSeeder extends Seeder
 
     public function run(): void
     {
-        Company::whereIn('company_handled_by', CompanySeeder::HANDLER_USER_IDS)
+        CompanySeeder::demoCompaniesQuery()
             ->each(function (Company $company) {
                 $designationIds = $this->ensureDesignations($company);
 

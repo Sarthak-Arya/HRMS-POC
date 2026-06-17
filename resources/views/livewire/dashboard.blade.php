@@ -1,6 +1,6 @@
 <main class="main-content position-relative max-height-vh-100 h-100 border-radius-lg">
     <div class="container-fluid py-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <div>
                 <h4 class="mb-0">{{ $companyName }}</h4>
                 <div class="text-sm text-muted">Company dashboard</div>
@@ -19,8 +19,8 @@
             </div>
         @endif
 
-        <div class="row mb-4">
-            <div class="col-xl-2 col-md-4 col-6 mb-3">
+        <div class="row row-cols-2 row-cols-md-3 row-cols-xl-6 g-3 mb-4">
+            <div class="col mb-0">
                 <a class="card h-100" href="{{ $companyId ? route('view-employee-details', ['company_id' => $companyId]) : '#' }}">
                     <div class="card-body p-3">
                         <div class="text-sm text-muted">Total Employees</div>
@@ -28,7 +28,7 @@
                     </div>
                 </a>
             </div>
-            <div class="col-xl-2 col-md-4 col-6 mb-3">
+            <div class="col mb-0">
                 <a class="card h-100" href="{{ $companyId ? route('view-employee-details', ['company_id' => $companyId]) : '#' }}">
                     <div class="card-body p-3">
                         <div class="text-sm text-muted">Active Employees</div>
@@ -36,7 +36,7 @@
                     </div>
                 </a>
             </div>
-            <div class="col-xl-2 col-md-4 col-6 mb-3">
+            <div class="col mb-0">
                 <a class="card h-100" href="{{ $companyId ? route('view-employee-details', ['company_id' => $companyId]) : '#' }}">
                     <div class="card-body p-3">
                         <div class="text-sm text-muted">Under PF</div>
@@ -44,7 +44,7 @@
                     </div>
                 </a>
             </div>
-            <div class="col-xl-2 col-md-4 col-6 mb-3">
+            <div class="col mb-0">
                 <a class="card h-100" href="{{ $companyId ? route('view-employee-details', ['company_id' => $companyId]) : '#' }}">
                     <div class="card-body p-3">
                         <div class="text-sm text-muted">Under ESI</div>
@@ -52,7 +52,7 @@
                     </div>
                 </a>
             </div>
-            <div class="col-xl-2 col-md-4 col-6 mb-3">
+            <div class="col mb-0">
                 <div class="card h-100">
                     <div class="card-body p-3">
                         <div class="text-sm text-muted">Departments</div>
@@ -60,7 +60,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xl-2 col-md-4 col-6 mb-3">
+            <div class="col mb-0">
                 <div class="card h-100">
                     <div class="card-body p-3">
                         <div class="text-sm text-muted">Locations</div>

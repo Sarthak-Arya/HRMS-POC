@@ -23,7 +23,7 @@ class CompensationSeeder extends Seeder
 {
     public function run(): void
     {
-        Company::whereIn('company_handled_by', CompanySeeder::HANDLER_USER_IDS)
+        CompanySeeder::demoCompaniesQuery()
             ->each(function (Company $company) {
                 $components = $this->seedComponents($company);
                 $standardStructure = $this->seedStructure($company, $components, 'Standard Grade', false, [
