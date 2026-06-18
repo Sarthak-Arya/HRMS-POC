@@ -117,7 +117,7 @@
         {{-- Assignments Tab --}}
         @if($activeTab === 'assignments')
             <div class="row">
-                <div class="col-lg-5 mb-4">
+                <div class="col-lg-4 mb-4">
                     <div class="card">
                         <div class="card-header"><h6 class="mb-0">Assign Structure</h6></div>
                         <div class="card-body">
@@ -132,35 +132,63 @@
                             </div>
                             @if($assignmentScopeType === 'location')
                                 <div class="mb-3">
-                                    <label class="form-label">Location</label>
-                                    <select wire:model="assignmentScopeId" class="form-control">
-                                        <option value="">Select location</option>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label class="form-label mb-0">Locations</label>
+                                        <span class="badge bg-secondary">{{ count($assignmentScopeIds) }} selected</span>
+                                    </div>
+                                    <div class="d-flex gap-2 mb-2">
+                                        <button type="button" class="btn btn-sm btn-outline-dark" wire:click="selectAllAssignmentScopes({{ $locations->pluck('id')->values()->toJson() }})">Select all</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="clearAssignmentScopes">Clear</button>
+                                    </div>
+                                    <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
                                         @foreach($locations as $location)
-                                            <option value="{{ $location->id }}">{{ $location->location_name }}</option>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" wire:model="assignmentScopeIds" value="{{ $location->id }}" id="assign-loc-{{ $location->id }}">
+                                                <label class="form-check-label text-sm" for="assign-loc-{{ $location->id }}">{{ $location->location_name }}</label>
+                                            </div>
                                         @endforeach
-                                    </select>
+                                    </div>
                                 </div>
                             @elseif($assignmentScopeType === 'department')
                                 <div class="mb-3">
-                                    <label class="form-label">Department</label>
-                                    <select wire:model="assignmentScopeId" class="form-control">
-                                        <option value="">Select department</option>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label class="form-label mb-0">Departments</label>
+                                        <span class="badge bg-secondary">{{ count($assignmentScopeIds) }} selected</span>
+                                    </div>
+                                    <div class="d-flex gap-2 mb-2">
+                                        <button type="button" class="btn btn-sm btn-outline-dark" wire:click="selectAllAssignmentScopes({{ $departments->pluck('id')->values()->toJson() }})">Select all</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="clearAssignmentScopes">Clear</button>
+                                    </div>
+                                    <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
                                         @foreach($departments as $department)
-                                            <option value="{{ $department->id }}">{{ $department->department_name }}</option>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" wire:model="assignmentScopeIds" value="{{ $department->id }}" id="assign-dept-{{ $department->id }}">
+                                                <label class="form-check-label text-sm" for="assign-dept-{{ $department->id }}">{{ $department->department_name }}</label>
+                                            </div>
                                         @endforeach
-                                    </select>
+                                    </div>
                                 </div>
                             @elseif($assignmentScopeType === 'employee')
                                 <div class="mb-3">
-                                    <label class="form-label">Employee</label>
-                                    <select wire:model="assignmentScopeId" wire:change="loadInheritancePreview" class="form-control">
-                                        <option value="">Select employee</option>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label class="form-label mb-0">Employees</label>
+                                        <span class="badge bg-secondary">{{ count($assignmentScopeIds) }} selected</span>
+                                    </div>
+                                    <div class="d-flex gap-2 mb-2">
+                                        <button type="button" class="btn btn-sm btn-outline-dark" wire:click="selectAllAssignmentScopes({{ $employees->pluck('id')->values()->toJson() }})">Select all</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="clearAssignmentScopes">Clear</button>
+                                    </div>
+                                    <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
                                         @foreach($employees as $employee)
-                                            <option value="{{ $employee->id }}">{{ $employee->employee_name }} ({{ $employee->employee_code }})</option>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" wire:model="assignmentScopeIds" value="{{ $employee->id }}" id="assign-emp-{{ $employee->id }}">
+                                                <label class="form-check-label text-sm" for="assign-emp-{{ $employee->id }}">{{ $employee->employee_name }} ({{ $employee->employee_code }})</label>
+                                            </div>
                                         @endforeach
-                                    </select>
+                                    </div>
                                 </div>
                             @endif
+                            @error('assignment_scope_ids') <span class="text-danger text-sm">{{ $message }}</span> @enderror
                             <div class="mb-3">
                                 <label class="form-label">Structure</label>
                                 <select wire:model="assignmentStructureId" class="form-control">
@@ -191,11 +219,56 @@
                                     </ul>
                                 </div>
                             @endif
+                            @error('assignment_bulk') <span class="text-danger text-sm d-block mb-2">{{ $message }}</span> @enderror
                             <button class="btn bg-gradient-dark" wire:click="saveAssignment">Save Assignment</button>
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-7 mb-4">
+                <div class="col-lg-8 mb-4">
+                    @if($assignmentStructureId !== '')
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0">Structure Components</h6>
+                                @if(!$assignmentStructureEditing)
+                                    <button type="button" class="btn btn-sm btn-outline-dark" wire:click="startAssignmentStructureEdit">Edit Structure</button>
+                                @endif
+                            </div>
+                            <div class="card-body">
+                                @if($assignmentStructureEditing)
+                                    @include('livewire.partials.structure-component-editor', [
+                                        'rows' => $assignmentStructureRows,
+                                        'rowsProperty' => 'assignmentStructureRows',
+                                        'wireKeyPrefix' => 'assignment-structure-row',
+                                        'addRowMethod' => 'addAssignmentStructureRow',
+                                        'removeRowMethod' => 'removeAssignmentStructureRow',
+                                        'previewCtcProperty' => 'assignmentPreviewCtc',
+                                        'errorField' => 'assignment_components',
+                                        'components' => $components,
+                                        'preview' => $assignmentStructurePreview,
+                                        'previewSummary' => $assignmentStructurePreviewSummary,
+                                    ])
+                                    <div class="d-flex gap-2 mt-3">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="cancelAssignmentStructureEdit">Cancel</button>
+                                        <button type="button" class="btn btn-sm bg-gradient-dark" wire:click="confirmSaveAssignmentStructure">Save Structure</button>
+                                    </div>
+                                    @error('assignment_components') <div class="text-danger text-sm mt-2">{{ $message }}</div> @enderror
+                                @else
+                                    @include('livewire.partials.structure-component-viewer', [
+                                        'summary' => $assignmentStructurePreviewSummary,
+                                        'previewCtcProperty' => 'assignmentPreviewCtc',
+                                        'components' => $components,
+                                        'rows' => $assignmentStructureRows,
+                                    ])
+                                @endif
+                            </div>
+                        </div>
+                    @else
+                        <div class="card mb-4">
+                            <div class="card-body text-center py-5">
+                                <p class="text-muted mb-0">Select a structure to view its components and monthly breakdown.</p>
+                            </div>
+                        </div>
+                    @endif
                     <div class="card">
                         <div class="card-header"><h6 class="mb-0">Current Assignments</h6></div>
                         <div class="card-body p-0">
@@ -213,7 +286,7 @@
                                     <tbody>
                                         @forelse($assignments as $assignment)
                                             <tr>
-                                                <td>{{ ucfirst($assignment->scope_type->value) }} {{ $assignment->scope_id ? '#'.$assignment->scope_id : '' }}</td>
+                                                <td>{{ ucfirst($assignment->scope_type->value) }}: {{ $assignmentScopeNames[$assignment->id] ?? '—' }}</td>
                                                 <td>{{ $assignment->structure->structure_name ?? '—' }}</td>
                                                 <td>{{ $assignment->effective_from->format('d M Y') }}</td>
                                                 <td>{{ $assignment->effective_to?->format('d M Y') ?? 'Open' }}</td>
@@ -422,103 +495,75 @@
                     </div>
                     <div class="modal-body">
                         <div class="row">
-                            <div class="col-md-8">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Structure Name</label>
-                                        <input type="text" wire:model.defer="structureName" class="form-control">
-                                        @error('structure_name') <span class="text-danger text-sm">{{ $message }}</span> @enderror
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Description</label>
-                                        <input type="text" wire:model.defer="structureDescription" class="form-control">
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-4 mb-3">
-                                        <label class="form-label">Effective From</label>
-                                        <input type="date" wire:model.defer="structureEffectiveFrom" class="form-control">
-                                    </div>
-                                    <div class="col-md-4 mb-3">
-                                        <label class="form-label">Effective To</label>
-                                        <input type="date" wire:model.defer="structureEffectiveTo" class="form-control">
-                                    </div>
-                                    <div class="col-md-4 mb-3 d-flex align-items-end gap-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" wire:model.defer="structureIsActive" id="structureIsActive">
-                                            <label class="form-check-label" for="structureIsActive">Active</label>
-                                        </div>
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" wire:model.defer="structureIsDefault" id="structureIsDefault">
-                                            <label class="form-check-label" for="structureIsDefault">Default</label>
-                                        </div>
-                                    </div>
-                                </div>
-                                <h6 class="mt-2">Components</h6>
-                                @foreach($structureRows as $index => $row)
-                                    <div class="row align-items-end mb-2" wire:key="structure-row-{{ $index }}">
-                                        <div class="col-md-4">
-                                            <select wire:model="structureRows.{{ $index }}.component_id" class="form-control form-control-sm">
-                                                <option value="">Component</option>
-                                                @foreach($components->where('is_active', true) as $component)
-                                                    <option value="{{ $component->id }}">{{ $component->component_name }}</option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-                                        <div class="col-md-2">
-                                            <select wire:model="structureRows.{{ $index }}.calculation_type" class="form-control form-control-sm">
-                                                <option value="">Default</option>
-                                                <option value="FIXED">Fixed</option>
-                                                <option value="PERCENT_BASIC">% Basic</option>
-                                                <option value="PERCENT_CTC">% CTC</option>
-                                                <option value="FORMULA">Formula</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-2">
-                                            <input type="number" step="0.01" wire:model="structureRows.{{ $index }}.value" class="form-control form-control-sm" placeholder="Value">
-                                        </div>
-                                        <div class="col-md-2">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" wire:model="structureRows.{{ $index }}.is_mandatory">
-                                                <label class="form-check-label text-sm">Mandatory</label>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-2">
-                                            <button type="button" class="btn btn-sm btn-outline-danger" wire:click="removeStructureRow({{ $index }})">Remove</button>
-                                        </div>
-                                    </div>
-                                @endforeach
-                                <button type="button" class="btn btn-sm btn-outline-dark" wire:click="addStructureRow">Add Row</button>
-                                @error('components') <div class="text-danger text-sm">{{ $message }}</div> @enderror
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Structure Name</label>
+                                <input type="text" wire:model.defer="structureName" class="form-control">
+                                @error('structure_name') <span class="text-danger text-sm">{{ $message }}</span> @enderror
                             </div>
-                            <div class="col-md-4">
-                                <div class="card bg-light">
-                                    <div class="card-body">
-                                        <h6>Preview</h6>
-                                        <div class="mb-3">
-                                            <label class="form-label text-sm">Annual CTC</label>
-                                            <input type="number" wire:model="previewAnnualCtc" class="form-control form-control-sm">
-                                        </div>
-                                        @if($structurePreview && $structurePreview->isNotEmpty())
-                                            <table class="table table-sm mb-0">
-                                                @foreach($structurePreview as $line)
-                                                    <tr>
-                                                        <td>{{ $line['name'] }}</td>
-                                                        <td class="text-end">{{ number_format($line['amount'], 2) }}</td>
-                                                    </tr>
-                                                @endforeach
-                                            </table>
-                                        @else
-                                            <p class="text-muted text-sm mb-0">Add components to see preview.</p>
-                                        @endif
-                                    </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Description</label>
+                                <input type="text" wire:model.defer="structureDescription" class="form-control">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Effective From</label>
+                                <input type="date" wire:model.defer="structureEffectiveFrom" class="form-control">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Effective To</label>
+                                <input type="date" wire:model.defer="structureEffectiveTo" class="form-control">
+                            </div>
+                            <div class="col-md-4 mb-3 d-flex align-items-end gap-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" wire:model.defer="structureIsActive" id="structureIsActive">
+                                    <label class="form-check-label" for="structureIsActive">Active</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" wire:model.defer="structureIsDefault" id="structureIsDefault">
+                                    <label class="form-check-label" for="structureIsDefault">Default</label>
                                 </div>
                             </div>
                         </div>
+                        @include('livewire.partials.structure-component-editor', [
+                            'rows' => $structureRows,
+                            'rowsProperty' => 'structureRows',
+                            'wireKeyPrefix' => 'structure-row',
+                            'addRowMethod' => 'addStructureRow',
+                            'removeRowMethod' => 'removeStructureRow',
+                            'previewCtcProperty' => 'previewAnnualCtc',
+                            'errorField' => 'components',
+                            'components' => $components,
+                            'preview' => $structurePreview,
+                        ])
                     </div>
                     <div class="modal-footer">
                         <button class="btn btn-secondary" wire:click="$set('showStructureModal', false)">Cancel</button>
                         <button class="btn bg-gradient-dark" wire:click="saveStructure">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Assignment Structure Save Confirmation --}}
+    @if($showAssignmentStructureSaveConfirm)
+        <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,.5);">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Save Structure Changes</h5>
+                        <button type="button" class="btn-close" wire:click="$set('showAssignmentStructureSaveConfirm', false)"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">You are about to update this compensation structure.</p>
+                        <div class="alert alert-warning text-sm mb-0">
+                            <strong>Company-wide impact:</strong> These changes will apply to every employee and assignment that uses this structure across the company, not only the scopes you are assigning now.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" wire:click="$set('showAssignmentStructureSaveConfirm', false)">Cancel</button>
+                        <button class="btn bg-gradient-dark" wire:click="saveAssignmentStructure">Yes, Save Structure</button>
                     </div>
                 </div>
             </div>

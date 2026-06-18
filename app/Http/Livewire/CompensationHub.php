@@ -12,6 +12,7 @@ use App\Services\Compensation\CompensationComponentService;
 use App\Services\Compensation\CompensationOverrideService;
 use App\Services\Compensation\CompensationResolver;
 use App\Services\Compensation\CompensationStructureService;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
@@ -93,11 +94,26 @@ class CompensationHub extends Component
     /** @var string The scope type for structure assignment (e.g., company, location, department, employee). */
     public string $assignmentScopeType = 'company';
 
-    /** @var string The specific ID for the assignment scope. */
-    public string $assignmentScopeId = '';
+    /** @var list<int|string> Selected scope entity IDs for bulk assignment. */
+    public array $assignmentScopeIds = [];
 
     /** @var string The ID of the structure being assigned. */
     public string $assignmentStructureId = '';
+
+    /** @var list<array<string, mixed>> Component rows for the structure being assigned. */
+    public array $assignmentStructureRows = [];
+
+    /** @var mixed Annual CTC used for assignment structure preview. */
+    public $assignmentPreviewCtc = 600000;
+
+    /** @var bool Whether assignment structure components have been loaded. */
+    public bool $assignmentStructureLoaded = false;
+
+    /** @var bool Whether the assignment structure is in edit mode. */
+    public bool $assignmentStructureEditing = false;
+
+    /** @var bool Whether to show the company-wide structure save confirmation. */
+    public bool $showAssignmentStructureSaveConfirm = false;
 
     /** @var string The effective from date for the assignment. */
     public string $assignmentEffectiveFrom = '';
@@ -296,14 +312,7 @@ class CompensationHub extends Component
             $this->structureEffectiveTo = $structure->effective_to?->toDateString() ?? '';
             $this->structureIsActive = $structure->is_active;
             $this->structureIsDefault = $structure->is_default;
-            $this->structureRows = $structure->structureComponents->map(fn ($row) => [
-                'component_id' => (string) $row->component_id,
-                'value' => $row->value,
-                'calculation_type' => $row->calculation_type?->value ?? '',
-                'formula_expression' => $row->formula_expression ?? '',
-                'is_mandatory' => $row->is_mandatory,
-                'display_order' => $row->display_order,
-            ])->values()->all();
+            $this->structureRows = $structure->structureComponents->map(fn ($row) => $this->mapStructureComponentRow($row))->values()->all();
         }
 
         if (empty($this->structureRows)) {
@@ -361,14 +370,7 @@ class CompensationHub extends Component
 
         $components = collect($this->structureRows)
             ->filter(fn ($row) => !empty($row['component_id']))
-            ->map(fn ($row, $index) => [
-                'component_id' => (int) $row['component_id'],
-                'value' => $row['value'] !== '' ? $row['value'] : null,
-                'calculation_type' => $row['calculation_type'] !== '' ? $row['calculation_type'] : null,
-                'formula_expression' => $row['formula_expression'] !== '' ? $row['formula_expression'] : null,
-                'is_mandatory' => (bool) ($row['is_mandatory'] ?? false),
-                'display_order' => (int) ($row['display_order'] ?? ($index + 1)),
-            ])
+            ->map(fn ($row, $index) => $this->formatComponentPayload($row, $index))
             ->values()
             ->all();
 
@@ -431,7 +433,201 @@ class CompensationHub extends Component
      */
     public function updatedAssignmentScopeType(): void
     {
-        $this->assignmentScopeId = '';
+        $this->assignmentScopeIds = [];
+        $this->inheritanceChain = [];
+    }
+
+    /**
+     * Reload inheritance preview when employee selection changes.
+     *
+     * @return void
+     */
+    public function updatedAssignmentScopeIds(): void
+    {
+        $this->loadInheritancePreview();
+    }
+
+    /**
+     * Load structure components when a structure is selected for assignment.
+     *
+     * @return void
+     */
+    public function updatedAssignmentStructureId(): void
+    {
+        $this->assignmentStructureRows = [];
+        $this->assignmentStructureLoaded = false;
+        $this->assignmentStructureEditing = false;
+        $this->showAssignmentStructureSaveConfirm = false;
+
+        if ($this->assignmentStructureId === '') {
+            return;
+        }
+
+        $this->loadAssignmentStructureRows();
+    }
+
+    /**
+     * Load structure component rows for the selected assignment structure.
+     *
+     * @return void
+     */
+    private function loadAssignmentStructureRows(): void
+    {
+        $structure = CompensationStructure::with('structureComponents')
+            ->where('company_id', $this->companyId)
+            ->find($this->assignmentStructureId);
+
+        if (!$structure) {
+            return;
+        }
+
+        $this->assignmentStructureRows = $structure->structureComponents
+            ->map(fn ($row) => $this->mapStructureComponentRow($row))
+            ->values()
+            ->all();
+
+        if (empty($this->assignmentStructureRows)) {
+            $this->addAssignmentStructureRow();
+        }
+
+        $this->assignmentStructureLoaded = true;
+    }
+
+    /**
+     * Enter edit mode for the assignment structure components.
+     *
+     * @return void
+     */
+    public function startAssignmentStructureEdit(): void
+    {
+        $this->assignmentStructureEditing = true;
+        $this->showAssignmentStructureSaveConfirm = false;
+    }
+
+    /**
+     * Cancel structure edits and reload from the database.
+     *
+     * @return void
+     */
+    public function cancelAssignmentStructureEdit(): void
+    {
+        $this->assignmentStructureEditing = false;
+        $this->showAssignmentStructureSaveConfirm = false;
+        $this->loadAssignmentStructureRows();
+        $this->resetErrorBag();
+    }
+
+    /**
+     * Show confirmation before saving structure changes company-wide.
+     *
+     * @return void
+     */
+    public function confirmSaveAssignmentStructure(): void
+    {
+        if ($this->assignmentStructureId === '') {
+            $this->addError('assignment_structure_id', 'Please select a structure.');
+
+            return;
+        }
+
+        $this->showAssignmentStructureSaveConfirm = true;
+    }
+
+    /**
+     * Persist assignment structure component edits to the master structure.
+     *
+     * @return void
+     */
+    public function saveAssignmentStructure(): void
+    {
+        $this->showAssignmentStructureSaveConfirm = false;
+
+        if ($this->assignmentStructureId === '') {
+            $this->addError('assignment_structure_id', 'Please select a structure.');
+
+            return;
+        }
+
+        $structure = CompensationStructure::where('company_id', $this->companyId)
+            ->findOrFail((int) $this->assignmentStructureId);
+
+        $components = collect($this->assignmentStructureRows)
+            ->filter(fn ($row) => !empty($row['component_id']))
+            ->map(fn ($row, $index) => $this->formatComponentPayload($row, $index))
+            ->values()
+            ->all();
+
+        try {
+            app(CompensationStructureService::class)->update((int) $this->companyId, (int) $this->assignmentStructureId, [
+                'structure_name' => $structure->structure_name,
+                'description' => $structure->description,
+                'effective_from' => $structure->effective_from?->toDateString(),
+                'effective_to' => $structure->effective_to?->toDateString(),
+                'is_active' => $structure->is_active,
+                'is_default' => $structure->is_default,
+            ], $components);
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $field => $messages) {
+                $this->addError('assignment_' . $field, $messages[0]);
+            }
+
+            return;
+        }
+
+        $this->assignmentStructureEditing = false;
+        $this->loadAssignmentStructureRows();
+        session()->flash('success', 'Structure updated company-wide.');
+    }
+
+    /**
+     * Add a component row to the assignment structure editor.
+     *
+     * @return void
+     */
+    public function addAssignmentStructureRow(): void
+    {
+        $this->assignmentStructureRows[] = [
+            'component_id' => '',
+            'value' => '',
+            'calculation_type' => '',
+            'formula_expression' => '',
+            'is_mandatory' => false,
+            'display_order' => count($this->assignmentStructureRows) + 1,
+        ];
+    }
+
+    /**
+     * Remove a component row from the assignment structure editor.
+     *
+     * @param int $index The index of the row to remove.
+     * @return void
+     */
+    public function removeAssignmentStructureRow(int $index): void
+    {
+        unset($this->assignmentStructureRows[$index]);
+        $this->assignmentStructureRows = array_values($this->assignmentStructureRows);
+    }
+
+    /**
+     * Select all scope entities for the current assignment scope type.
+     *
+     * @param list<int> $allIds
+     * @return void
+     */
+    public function selectAllAssignmentScopes(array $allIds): void
+    {
+        $this->assignmentScopeIds = array_map('strval', $allIds);
+        $this->loadInheritancePreview();
+    }
+
+    /**
+     * Clear all selected scope entities.
+     *
+     * @return void
+     */
+    public function clearAssignmentScopes(): void
+    {
+        $this->assignmentScopeIds = [];
         $this->inheritanceChain = [];
     }
 
@@ -442,12 +638,18 @@ class CompensationHub extends Component
      */
     public function loadInheritancePreview(): void
     {
-        if ($this->assignmentScopeType === 'employee' && $this->assignmentScopeId !== '') {
-            $employee = Employee::where('company_id', $this->companyId)->find($this->assignmentScopeId);
-            if ($employee) {
-                $this->inheritanceChain = app(CompensationAssignmentService::class)
-                    ->inheritanceChainForEmployee($employee);
-            }
+        $this->inheritanceChain = [];
+
+        if ($this->assignmentScopeType !== 'employee' || count($this->assignmentScopeIds) !== 1) {
+            return;
+        }
+
+        $employeeId = (int) $this->assignmentScopeIds[0];
+        $employee = Employee::where('company_id', $this->companyId)->find($employeeId);
+
+        if ($employee) {
+            $this->inheritanceChain = app(CompensationAssignmentService::class)
+                ->inheritanceChainForEmployee($employee);
         }
     }
 
@@ -458,21 +660,231 @@ class CompensationHub extends Component
      */
     public function saveAssignment(): void
     {
+        if ($this->assignmentStructureId === '') {
+            $this->addError('assignment_structure_id', 'Please select a structure.');
+
+            return;
+        }
+
+        if ($this->assignmentScopeType !== 'company' && empty($this->assignmentScopeIds)) {
+            $this->addError('assignment_scope_ids', 'Please select at least one scope.');
+
+            return;
+        }
+
+        $assignmentData = [
+            'scope_type' => $this->assignmentScopeType,
+            'structure_id' => (int) $this->assignmentStructureId,
+            'effective_from' => $this->assignmentEffectiveFrom,
+            'effective_to' => $this->assignmentEffectiveTo !== '' ? $this->assignmentEffectiveTo : null,
+        ];
+
+        $scopeIds = array_map('intval', $this->assignmentScopeIds);
+
         try {
-            app(CompensationAssignmentService::class)->assign((int) $this->companyId, [
-                'scope_type' => $this->assignmentScopeType,
-                'scope_id' => $this->assignmentScopeId !== '' ? (int) $this->assignmentScopeId : null,
-                'structure_id' => (int) $this->assignmentStructureId,
-                'effective_from' => $this->assignmentEffectiveFrom,
-                'effective_to' => $this->assignmentEffectiveTo !== '' ? $this->assignmentEffectiveTo : null,
-            ]);
-            session()->flash('success', 'Structure assignment saved.');
-            $this->assignmentStructureId = '';
+            $result = app(CompensationAssignmentService::class)->assignBulk(
+                (int) $this->companyId,
+                $assignmentData,
+                $scopeIds,
+            );
         } catch (ValidationException $e) {
             foreach ($e->errors() as $field => $messages) {
                 $this->addError('assignment_' . $field, $messages[0]);
             }
+
+            return;
         }
+
+        $createdCount = $result['created']->count();
+        $failedCount = count($result['failed']);
+
+        if ($createdCount === 0 && $failedCount > 0) {
+            $this->addError('assignment_bulk', $result['failed'][0]['message']);
+
+            return;
+        }
+
+        $message = $createdCount === 1
+            ? 'Assignment saved.'
+            : "{$createdCount} assignments saved.";
+
+        if ($failedCount > 0) {
+            $failedDetails = collect($result['failed'])
+                ->map(fn ($item) => ($item['scope_id'] ?? 'company') . ': ' . $item['message'])
+                ->implode('; ');
+            $message .= " {$failedCount} failed ({$failedDetails}).";
+        }
+
+        session()->flash('success', $message);
+        $this->resetAssignmentForm();
+    }
+
+    /**
+     * Reset assignment form fields after a successful save.
+     *
+     * @return void
+     */
+    private function resetAssignmentForm(): void
+    {
+        $this->assignmentStructureId = '';
+        $this->assignmentStructureRows = [];
+        $this->assignmentStructureLoaded = false;
+        $this->assignmentStructureEditing = false;
+        $this->showAssignmentStructureSaveConfirm = false;
+        $this->assignmentScopeIds = [];
+        $this->inheritanceChain = [];
+        $this->assignmentEffectiveTo = '';
+        $this->resetErrorBag();
+    }
+
+    /**
+     * Map a structure component model row to form array shape.
+     *
+     * @param \App\Models\StructureComponent $row
+     * @return array<string, mixed>
+     */
+    private function mapStructureComponentRow($row): array
+    {
+        return [
+            'component_id' => (string) $row->component_id,
+            'value' => $row->value,
+            'calculation_type' => $row->calculation_type?->value ?? '',
+            'formula_expression' => $row->formula_expression ?? '',
+            'is_mandatory' => $row->is_mandatory,
+            'display_order' => $row->display_order,
+        ];
+    }
+
+    /**
+     * Format a structure component row for service persistence.
+     *
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function formatComponentPayload(array $row, int $index): array
+    {
+        return [
+            'component_id' => (int) $row['component_id'],
+            'value' => $row['value'] !== '' ? $row['value'] : null,
+            'calculation_type' => $row['calculation_type'] !== '' ? $row['calculation_type'] : null,
+            'formula_expression' => $row['formula_expression'] !== '' ? $row['formula_expression'] : null,
+            'is_mandatory' => (bool) ($row['is_mandatory'] ?? false),
+            'display_order' => (int) ($row['display_order'] ?? ($index + 1)),
+        ];
+    }
+
+    /**
+     * Build a monthly amount preview for structure component rows.
+     *
+     * @param Collection<int, \App\Models\CompensationComponent> $components
+     * @param list<array<string, mixed>> $rows
+     * @return Collection<int, array{name: string, type: string, amount: float}>
+     */
+    private function buildStructurePreview(Collection $components, array $rows, float $annualCtc): Collection
+    {
+        return collect($rows)
+            ->filter(fn ($row) => !empty($row['component_id']))
+            ->map(function ($row) use ($components, $rows, $annualCtc) {
+                $component = $components->firstWhere('id', (int) $row['component_id']);
+                if (!$component) {
+                    return null;
+                }
+
+                $calcType = $row['calculation_type'] !== ''
+                    ? $row['calculation_type']
+                    : $component->default_calculation_type->value;
+                $value = $row['value'] !== '' ? (float) $row['value'] : (float) ($component->default_value ?? 0);
+                $monthlyCtc = $annualCtc / 12;
+                $basic = collect($rows)->first(function ($r) use ($components) {
+                    $c = $components->firstWhere('id', (int) ($r['component_id'] ?? 0));
+
+                    return $c && strcasecmp($c->component_name, 'Basic') === 0;
+                });
+                $basicAmount = $basic && $basic['value'] !== '' ? (float) $basic['value'] : 0;
+
+                $amount = match ($calcType) {
+                    'PERCENT_BASIC' => $basicAmount * ($value / 100),
+                    'PERCENT_CTC' => $monthlyCtc * ($value / 100),
+                    default => $value,
+                };
+
+                return [
+                    'name' => $component->component_name,
+                    'type' => $component->component_type->value,
+                    'amount' => round($amount, 2),
+                ];
+            })
+            ->filter()
+            ->values();
+    }
+
+    /**
+     * Build preview lines with earnings, deductions, and net totals.
+     *
+     * @param Collection<int, \App\Models\CompensationComponent> $components
+     * @param list<array<string, mixed>> $rows
+     * @return array{
+     *     lines: Collection<int, array{name: string, type: string, amount: float, calculation: string, config_value: string}>,
+     *     totalEarnings: float,
+     *     totalDeductions: float,
+     *     netPay: float
+     * }
+     */
+    private function buildStructurePreviewSummary(Collection $components, array $rows, float $annualCtc): array
+    {
+        $lines = collect($rows)
+            ->filter(fn ($row) => !empty($row['component_id']))
+            ->map(function ($row) use ($components, $rows, $annualCtc) {
+                $component = $components->firstWhere('id', (int) $row['component_id']);
+                if (!$component) {
+                    return null;
+                }
+
+                $calcType = $row['calculation_type'] !== ''
+                    ? $row['calculation_type']
+                    : $component->default_calculation_type->value;
+                $value = $row['value'] !== '' ? (float) $row['value'] : (float) ($component->default_value ?? 0);
+                $monthlyCtc = $annualCtc / 12;
+                $basic = collect($rows)->first(function ($r) use ($components) {
+                    $c = $components->firstWhere('id', (int) ($r['component_id'] ?? 0));
+
+                    return $c && strcasecmp($c->component_name, 'Basic') === 0;
+                });
+                $basicAmount = $basic && $basic['value'] !== '' ? (float) $basic['value'] : 0;
+
+                $amount = match ($calcType) {
+                    'PERCENT_BASIC' => $basicAmount * ($value / 100),
+                    'PERCENT_CTC' => $monthlyCtc * ($value / 100),
+                    default => $value,
+                };
+
+                $calcLabel = match ($calcType) {
+                    'PERCENT_BASIC' => '% of Basic',
+                    'PERCENT_CTC' => '% of CTC',
+                    'FORMULA' => 'Formula',
+                    default => 'Fixed',
+                };
+
+                return [
+                    'name' => $component->component_name,
+                    'type' => $component->component_type->value,
+                    'amount' => round($amount, 2),
+                    'calculation' => $calcLabel,
+                    'config_value' => $row['value'] !== '' ? (string) $row['value'] : (string) ($component->default_value ?? '0'),
+                ];
+            })
+            ->filter()
+            ->values();
+
+        $totalEarnings = round($lines->where('type', 'EARNING')->sum('amount'), 2);
+        $totalDeductions = round($lines->where('type', 'DEDUCTION')->sum('amount'), 2);
+
+        return [
+            'lines' => $lines,
+            'totalEarnings' => $totalEarnings,
+            'totalDeductions' => $totalDeductions,
+            'netPay' => round($totalEarnings - $totalDeductions, 2),
+        ];
     }
 
     /**
@@ -576,41 +988,25 @@ class CompensationHub extends Component
 
         $structurePreview = null;
         if ($this->showStructureModal && !empty($this->structureRows)) {
-            $structurePreview = collect($this->structureRows)
-                ->filter(fn ($row) => !empty($row['component_id']))
-                ->map(function ($row) use ($components) {
-                    $component = $components->firstWhere('id', (int) $row['component_id']);
-                    if (!$component) {
-                        return null;
-                    }
-
-                    $calcType = $row['calculation_type'] !== ''
-                        ? $row['calculation_type']
-                        : $component->default_calculation_type->value;
-                    $value = $row['value'] !== '' ? (float) $row['value'] : (float) ($component->default_value ?? 0);
-                    $monthlyCtc = ((float) $this->previewAnnualCtc) / 12;
-                    $basic = collect($this->structureRows)->first(function ($r) use ($components) {
-                        $c = $components->firstWhere('id', (int) ($r['component_id'] ?? 0));
-
-                        return $c && strcasecmp($c->component_name, 'Basic') === 0;
-                    });
-                    $basicAmount = $basic && $basic['value'] !== '' ? (float) $basic['value'] : 0;
-
-                    $amount = match ($calcType) {
-                        'PERCENT_BASIC' => $basicAmount * ($value / 100),
-                        'PERCENT_CTC' => $monthlyCtc * ($value / 100),
-                        default => $value,
-                    };
-
-                    return [
-                        'name' => $component->component_name,
-                        'type' => $component->component_type->value,
-                        'amount' => round($amount, 2),
-                    ];
-                })
-                ->filter()
-                ->values();
+            $structurePreview = $this->buildStructurePreview(
+                $components,
+                $this->structureRows,
+                (float) $this->previewAnnualCtc,
+            );
         }
+
+        $assignmentStructurePreview = null;
+        $assignmentStructurePreviewSummary = null;
+        if ($this->assignmentStructureId !== '' && !empty($this->assignmentStructureRows)) {
+            $assignmentStructurePreviewSummary = $this->buildStructurePreviewSummary(
+                $components,
+                $this->assignmentStructureRows,
+                (float) $this->assignmentPreviewCtc,
+            );
+            $assignmentStructurePreview = $assignmentStructurePreviewSummary['lines'];
+        }
+
+        $assignmentScopeNames = $this->buildAssignmentScopeNames($assignments, $locations, $departments, $employees);
 
         return view('livewire.compensation-hub', [
             'components' => $components,
@@ -622,7 +1018,39 @@ class CompensationHub extends Component
             'scopeOverrides' => $scopeOverrides,
             'resolvedPreview' => $resolvedPreview,
             'structurePreview' => $structurePreview,
+            'assignmentStructurePreview' => $assignmentStructurePreview,
+            'assignmentStructurePreviewSummary' => $assignmentStructurePreviewSummary,
+            'assignmentScopeNames' => $assignmentScopeNames,
         ]);
+    }
+
+    /**
+     * Build human-readable scope labels for assignment list rows.
+     *
+     * @param Collection<int, \App\Models\CompensationStructureAssignment> $assignments
+     * @return array<int, string>
+     */
+    private function buildAssignmentScopeNames(
+        Collection $assignments,
+        Collection $locations,
+        Collection $departments,
+        Collection $employees,
+    ): array {
+        $names = [];
+
+        foreach ($assignments as $assignment) {
+            $names[$assignment->id] = match ($assignment->scope_type) {
+                CompensationScopeType::COMPANY => 'Company',
+                CompensationScopeType::LOCATION => $locations->firstWhere('id', $assignment->scope_id)?->location_name
+                    ?? 'Location #' . $assignment->scope_id,
+                CompensationScopeType::DEPARTMENT => $departments->firstWhere('id', $assignment->scope_id)?->department_name
+                    ?? 'Department #' . $assignment->scope_id,
+                CompensationScopeType::EMPLOYEE => optional($employees->firstWhere('id', $assignment->scope_id))->employee_name
+                    ?? 'Employee #' . $assignment->scope_id,
+            };
+        }
+
+        return $names;
     }
 }
 

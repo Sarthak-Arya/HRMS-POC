@@ -117,10 +117,10 @@ Route::middleware('auth')->group(function () {
             });
         });
     });
-    });
-
-    Route::get('/tables', action: Tables::class)->name('tables');
-    Route::get('/static-sign-in', action: StaticSignIn::class)->name('sign-in');
-    Route::get('/static-sign-up', action: StaticSignUp::class)->name('static-sign-up');
-    Route::get('/rtl', Rtl::class)->name('rtl');
 });
+
+Route::get('/tables', action: Tables::class)->name('tables');
+Route::get('/static-sign-in', action: StaticSignIn::class)->name('sign-in');
+Route::get('/static-sign-up', action: StaticSignUp::class)->name('static-sign-up');
+Route::get('/rtl', Rtl::class)->name('rtl');
+

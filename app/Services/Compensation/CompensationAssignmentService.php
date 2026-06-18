@@ -48,6 +48,44 @@ class CompensationAssignmentService
         ]);
     }
 
+    /**
+     * @param array<string, mixed> $data
+     * @param list<int> $scopeIds
+     * @return array{created: Collection<int, CompensationStructureAssignment>, failed: list<array{scope_id: int|null, message: string}>}
+     */
+    public function assignBulk(int $companyId, array $data, array $scopeIds): array
+    {
+        $scopeType = CompensationScopeType::from($data['scope_type']);
+        $created = collect();
+        $failed = [];
+
+        if ($scopeType === CompensationScopeType::COMPANY) {
+            try {
+                $created->push($this->assign($companyId, array_merge($data, ['scope_id' => null])));
+            } catch (ValidationException $e) {
+                $failed[] = [
+                    'scope_id' => null,
+                    'message' => (string) collect($e->errors())->flatten()->first(),
+                ];
+            }
+
+            return ['created' => $created, 'failed' => $failed];
+        }
+
+        foreach ($scopeIds as $scopeId) {
+            try {
+                $created->push($this->assign($companyId, array_merge($data, ['scope_id' => (int) $scopeId])));
+            } catch (ValidationException $e) {
+                $failed[] = [
+                    'scope_id' => (int) $scopeId,
+                    'message' => (string) collect($e->errors())->flatten()->first(),
+                ];
+            }
+        }
+
+        return ['created' => $created, 'failed' => $failed];
+    }
+
     public function delete(int $companyId, int $assignmentId): void
     {
         CompensationStructureAssignment::where('company_id', $companyId)->findOrFail($assignmentId)->delete();

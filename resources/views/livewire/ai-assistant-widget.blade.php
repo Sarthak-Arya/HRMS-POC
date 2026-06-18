@@ -547,13 +547,15 @@
             });
 
             document.addEventListener('livewire:load', function () {
-                initAiVoice();
+                setupAiVoiceDelegates();
+                refreshAiVoiceMicBtn();
                 syncSttLangButtons(getSttLang());
             });
             document.addEventListener('livewire:update', function () {
                 scrollAiMessages();
-                initAiVoice();
+                refreshAiVoiceMicBtn();
                 syncSttLangButtons(getSttLang());
+                restoreAiVoiceListeningUi();
             });
             window.addEventListener('ai-conversation-reset', function () {
                 var scrollEl = document.getElementById('ai-messages-scroll');
@@ -578,12 +580,214 @@
                 if (el) el.scrollTop = el.scrollHeight;
             }
 
-            function initAiVoice() {
-                const btn = document.getElementById('ai-voice-btn');
-                if (!btn || btn.dataset.initialized) return;
-                btn.dataset.initialized = '1';
+            var aiVoiceState = {
+                recognition: null,
+                listening: false,
+                manualStop: false,
+                baseText: '',
+                sessionFinal: '',
+                micBtn: null,
+            };
 
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            function getAiVoiceWireId() {
+                var btn = aiVoiceState.micBtn || document.getElementById('ai-voice-btn');
+                if (!btn) return null;
+                var component = btn.closest('[wire\\:id]');
+                return component ? component.getAttribute('wire:id') : null;
+            }
+
+            function syncAiVoiceInputToLivewire(value) {
+                var wireId = getAiVoiceWireId();
+                if (window.Livewire && wireId) {
+                    Livewire.find(wireId).set('input', value);
+                }
+            }
+
+            function updateAiVoiceInputDom(value) {
+                var input = document.getElementById('ai-assistant-input');
+                if (input) {
+                    input.value = value;
+                }
+            }
+
+            function syncAiVoiceInput(value, pushToLivewire) {
+                updateAiVoiceInputDom(value);
+                if (pushToLivewire) {
+                    syncAiVoiceInputToLivewire(value);
+                }
+            }
+
+            function restoreAiVoiceListeningUi() {
+                if (!aiVoiceState.listening || aiVoiceState.manualStop) return;
+                var domBtn = document.getElementById('ai-voice-btn');
+                if (!domBtn) return;
+                aiVoiceState.micBtn = domBtn;
+                domBtn.classList.add('listening');
+                var lang = getSttLang();
+                var labels = {'hi-IN': 'Hindi', 'en-IN': 'English (India)', 'en-US': 'English (US)'};
+                domBtn.title = 'Stop voice input — ' + (labels[lang] || lang);
+            }
+
+            function setAiVoiceListeningUi(active) {
+                aiVoiceState.listening = active;
+                var btn = document.getElementById('ai-voice-btn') || aiVoiceState.micBtn;
+                if (btn) {
+                    aiVoiceState.micBtn = btn;
+                }
+                if (!btn) return;
+                btn.classList.toggle('listening', active);
+                var lang = getSttLang();
+                var labels = {'hi-IN': 'Hindi', 'en-IN': 'English (India)', 'en-US': 'English (US)'};
+                btn.title = active
+                    ? 'Stop voice input — ' + (labels[lang] || lang)
+                    : 'Voice input — ' + (labels[lang] || lang);
+            }
+
+            function pushAiVoiceInputToLivewire() {
+                var input = document.getElementById('ai-assistant-input');
+                if (input) {
+                    syncAiVoiceInputToLivewire(input.value);
+                }
+            }
+
+            function stopAiVoiceListening() {
+                if (!aiVoiceState.listening && !aiVoiceState.recognition) return;
+                aiVoiceState.manualStop = true;
+                pushAiVoiceInputToLivewire();
+                if (aiVoiceState.recognition) {
+                    try {
+                        aiVoiceState.recognition.stop();
+                    } catch (err) {
+                        setAiVoiceListeningUi(false);
+                    }
+                } else {
+                    setAiVoiceListeningUi(false);
+                }
+            }
+
+            function createAiVoiceRecognition(SpeechRecognition) {
+                var recognition = new SpeechRecognition();
+                recognition.lang = getSttLang();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.maxAlternatives = 1;
+
+                recognition.onstart = function () {
+                    setAiVoiceListeningUi(true);
+                };
+
+                recognition.onend = function () {
+                    if (!aiVoiceState.manualStop) {
+                        try {
+                            recognition.start();
+                        } catch (err) {
+                            setTimeout(function () {
+                                if (!aiVoiceState.manualStop) {
+                                    try {
+                                        recognition.start();
+                                    } catch (retryErr) {
+                                        aiVoiceState.manualStop = true;
+                                        setAiVoiceListeningUi(false);
+                                    }
+                                }
+                            }, 150);
+                        }
+                        return;
+                    }
+                    setAiVoiceListeningUi(false);
+                    pushAiVoiceInputToLivewire();
+                    aiVoiceState.recognition = null;
+                };
+
+                recognition.onresult = function (event) {
+                    var interim = '';
+                    for (var i = event.resultIndex; i < event.results.length; i++) {
+                        var transcript = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) {
+                            aiVoiceState.sessionFinal += transcript;
+                            if (!aiVoiceState.sessionFinal.endsWith(' ')) {
+                                aiVoiceState.sessionFinal += ' ';
+                            }
+                        } else {
+                            interim += transcript;
+                        }
+                    }
+                    syncAiVoiceInput(aiVoiceState.baseText + aiVoiceState.sessionFinal + interim, false);
+                };
+
+                recognition.onerror = function (event) {
+                    if (event.error === 'aborted' && aiVoiceState.manualStop) return;
+                    if (event.error === 'no-speech') return;
+                    console.warn('Speech recognition error:', event.error);
+                    aiVoiceState.manualStop = true;
+                    setAiVoiceListeningUi(false);
+                    aiVoiceState.recognition = null;
+                };
+
+                return recognition;
+            }
+
+            function startAiVoiceListening() {
+                var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) return;
+
+                var input = document.getElementById('ai-assistant-input');
+                aiVoiceState.baseText = input ? input.value : '';
+                if (aiVoiceState.baseText && !aiVoiceState.baseText.endsWith(' ')) {
+                    aiVoiceState.baseText += ' ';
+                }
+                aiVoiceState.sessionFinal = '';
+                aiVoiceState.manualStop = false;
+
+                aiVoiceState.recognition = createAiVoiceRecognition(SpeechRecognition);
+
+                try {
+                    aiVoiceState.recognition.start();
+                } catch (err) {
+                    console.warn('Speech recognition start failed:', err.message);
+                    aiVoiceState.recognition = null;
+                    setAiVoiceListeningUi(false);
+                }
+            }
+
+            function handleAiVoiceMicClick() {
+                if (aiVoiceState.listening || aiVoiceState.recognition) {
+                    stopAiVoiceListening();
+                    return;
+                }
+                startAiVoiceListening();
+            }
+
+            function setupAiVoiceDelegates() {
+                if (window.__aiVoiceDelegatesReady) return;
+                window.__aiVoiceDelegatesReady = true;
+
+                document.addEventListener('click', function (e) {
+                    var micBtn = e.target.closest('#ai-voice-btn');
+                    if (micBtn && micBtn.closest('.ai-assistant-widget') && !micBtn.disabled) {
+                        aiVoiceState.micBtn = micBtn;
+                        handleAiVoiceMicClick();
+                        return;
+                    }
+                    var sendBtn = e.target.closest('.ai-assistant-widget .ai-action-btn-send');
+                    if (sendBtn && !sendBtn.disabled) {
+                        stopAiVoiceListening();
+                    }
+                });
+
+                document.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' && !e.shiftKey && e.target && e.target.id === 'ai-assistant-input') {
+                        stopAiVoiceListening();
+                    }
+                });
+            }
+
+            function refreshAiVoiceMicBtn() {
+                var btn = document.getElementById('ai-voice-btn');
+                if (!btn) return;
+                aiVoiceState.micBtn = btn;
+
+                var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (!SpeechRecognition) {
                     btn.title = 'Voice not supported in this browser';
                     btn.disabled = true;
@@ -591,62 +795,12 @@
                 }
 
                 setSttLang(getSttLang());
-
-                let recognition = null;
-                let listening = false;
-
-                btn.addEventListener('click', function () {
-                    if (listening && recognition) {
-                        recognition.stop();
-                        return;
-                    }
-
-                    recognition = new SpeechRecognition();
-                    recognition.lang = getSttLang();
-                    recognition.interimResults = false;
-                    recognition.maxAlternatives = 1;
-
-                    recognition.onstart = function () {
-                        listening = true;
-                        btn.classList.add('listening');
-                    };
-
-                    recognition.onend = function () {
-                        listening = false;
-                        btn.classList.remove('listening');
-                    };
-
-                    recognition.onresult = function (event) {
-                        const transcript = event.results[0][0].transcript;
-                        const input = document.getElementById('ai-assistant-input');
-                        const component = btn.closest('[wire\\:id]');
-                        const wireId = component ? component.getAttribute('wire:id') : null;
-
-                        if (input) {
-                            input.value = transcript;
-                            input.dispatchEvent(new Event('input', { bubbles: true }));
-                        }
-                        if (window.Livewire && wireId) {
-                            Livewire.find(wireId).set('input', transcript);
-                        }
-                    };
-
-                    recognition.onerror = function () {
-                        listening = false;
-                        btn.classList.remove('listening');
-                    };
-
-                    try {
-                        recognition.start();
-                    } catch (err) {
-                        console.warn('Speech recognition start failed:', err.message);
-                    }
-                });
             }
 
             if (document.readyState === 'complete' || document.readyState === 'interactive') {
                 setTimeout(function () {
-                    initAiVoice();
+                    setupAiVoiceDelegates();
+                    refreshAiVoiceMicBtn();
                     syncSttLangButtons(getSttLang());
                 }, 500);
             }
