@@ -6,9 +6,9 @@
         </div>
         <div class="card-body px-0 pt-0 pb-2">
             <div class="table-responsive p-0">
-                <div class="row px-4 mt-3">
+                <div class="row px-4 mt-3 g-3 align-items-end">
                     <div class="col-md-2">
-                        <label>Location</label>
+                        <label class="form-label text-sm text-secondary mb-1">Location</label>
                         <select wire:model="selectedLocation" class="form-control">
                             <option value="">All Locations</option>
                             @foreach($locations as $location)
@@ -17,7 +17,7 @@
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <label>Month</label>
+                        <label class="form-label text-sm text-secondary mb-1">Month</label>
                         <select wire:model="month" class="form-control">
                             @for($m=1; $m<=12; $m++)
                                 <option value="{{ $m }}">{{ DateTime::createFromFormat('!m', $m)->format('F') }}</option>
@@ -25,11 +25,11 @@
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <label>Year</label>
+                        <label class="form-label text-sm text-secondary mb-1">Year</label>
                         <input type="number" wire:model="year" class="form-control" min="2000" max="2100">
                     </div>
                     <div class="col-md-3">
-                        <label>Department</label>
+                        <label class="form-label text-sm text-secondary mb-1">Department</label>
                         <select wire:model="selectedDepartment" class="form-control">
                             <option value="">All Departments</option>
                             @foreach($departments as $department)
@@ -38,7 +38,7 @@
                         </select>
                     </div>
                     <div class="col-md-3">
-                        <label>Designation</label>
+                        <label class="form-label text-sm text-secondary mb-1">Designation</label>
                         <select wire:model="selectedDesignation" class="form-control">
                             <option value="">All Designations</option>
                             @foreach($designations as $designation)
@@ -47,17 +47,43 @@
                         </select>
                     </div>
                 </div>
-                <div class="row px-4 mt-3">
-                    <div class="col-md-6">
+                <div class="row px-4 mt-2">
+                    <div class="col-12">
                         <form wire:submit.prevent="importExcel" enctype="multipart/form-data">
-                            <div class="input-group mb-3">
-                                <input type="file" class="form-control" wire:model="excel_file" accept=".xlsx,.xls">
-                                <button class="btn btn-success" type="submit">Import Monthly Attendance (Excel)</button>
-                                <button type="button" class="btn btn-info ms-2" wire:click.prevent="downloadTemplate">Download Excel Template</button>
+                            <label class="form-label text-sm text-secondary mb-2 d-block">Import from Excel</label>
+                            <div class="row g-2 align-items-center">
+                                <div class="col-lg-4 col-md-6">
+                                    <input
+                                        type="file"
+                                        class="form-control"
+                                        wire:model="excel_file"
+                                        accept=".xlsx,.xls"
+                                    >
+                                </div>
+                                <div class="col-lg-auto col-md-6">
+                                    <div class="d-flex flex-wrap gap-2">
+                                    <button
+                                        class="btn bg-gradient-success mb-0 text-nowrap"
+                                        type="submit"
+                                        wire:loading.attr="disabled"
+                                        wire:target="importExcel,excel_file"
+                                    >
+                                        <span wire:loading.remove wire:target="importExcel,excel_file">Import attendance</span>
+                                        <span wire:loading wire:target="importExcel,excel_file">Importing…</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="btn bg-gradient-info mb-0 text-nowrap"
+                                        wire:click.prevent="downloadTemplate"
+                                    >
+                                        Download template
+                                    </button>
+                                    </div>
+                                </div>
                             </div>
-                            @error('excel_file') <span class="text-danger">{{ $message }}</span> @enderror
+                            @error('excel_file') <span class="text-danger text-sm d-block mt-2">{{ $message }}</span> @enderror
                             @if (session()->has('import_message'))
-                                <div class="alert alert-success mt-2">{{ session('import_message') }}</div>
+                                <div class="alert alert-success mt-2 mb-0">{{ session('import_message') }}</div>
                             @endif
                         </form>
                     </div>

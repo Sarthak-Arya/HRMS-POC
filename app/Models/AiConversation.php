@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $user_id
  * @property int $company_id
  * @property string $title
+ * @property string|null $pending_excel_path
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \App\Models\User $user
@@ -25,6 +26,7 @@ class AiConversation extends Model
         'user_id',
         'company_id',
         'title',
+        'pending_excel_path',
     ];
 
     /**

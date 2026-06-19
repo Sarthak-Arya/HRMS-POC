@@ -4,6 +4,17 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (!theme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                theme = 'dark';
+            }
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
     <!-- Metas -->
     @if (env('IS_DEMO'))
         <x-demo-metas></x-demo-metas>
@@ -27,6 +38,7 @@
     <!-- CSS Files -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link id="pagestyle" href="{{ asset('assets/css/soft-ui-dashboard.css') }}?v=1" rel="stylesheet" />
+    <link href="{{ asset('assets/css/dark-mode.css') }}?v=8" rel="stylesheet" />
     <!-- Alpine -->
     <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
     @livewireStyles
@@ -41,72 +53,122 @@
             transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* When sidebar is collapsed, remove the Soft UI left offset on smaller screens. */
-        body:not(.g-sidenav-pinned) .sidenav.fixed-start~.main-content {
-            margin-left: 0 !important;
-        }
-
+        /* Sidebar layout: offset main content only (not the body) */
         body.g-sidenav-pinned {
-            margin-left: 15.625rem;
-            width: calc(100% - 15.625rem);
-            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-left: 0 !important;
+            width: 100% !important;
         }
 
-        body:not(.g-sidenav-pinned) .main-content {
-            margin-left: 0;
-            width: 100%;
-            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        /* Theme: dark */
-        body.theme-dark {
-            --bs-body-bg: #0b1220;
-            --bs-body-color: #e5e7eb;
-            background-color: var(--bs-body-bg) !important;
-            color: var(--bs-body-color) !important;
-        }
-
-        body.theme-dark .card,
-        body.theme-dark .modal-content,
-        body.theme-dark .dropdown-menu {
-            background-color: #111827;
-            color: #e5e7eb;
-            border-color: #1f2937;
-        }
-
-        body.theme-dark .text-dark,
-        body.theme-dark .breadcrumb-item.text-dark,
-        body.theme-dark .breadcrumb-item.text-dark.active {
-            color: #e5e7eb !important;
-        }
-
-        body.theme-dark .form-control {
-            background-color: #0f172a;
-            color: #e5e7eb;
-            border-color: #334155;
-        }
-
-        body.theme-dark .form-control::placeholder {
-            color: #94a3b8;
-        }
-
-        body.theme-dark hr {
-            border-color: rgba(148, 163, 184, 0.35);
-        }
-
-        /* Prevent sidenav toggler overlapping breadcrumb (desktop sizes can still be < xl). */
-        @media (max-width: 2000px) {
-
-            #navbarBlur nav[aria-label="breadcrumb"],
-            #navbarBlur h6 {
-                padding-left: 3rem;
+        @media (min-width: 1200px) {
+            body.g-sidenav-pinned .sidenav.fixed-start ~ .main-content {
+                margin-left: 17.125rem;
             }
         }
 
-        /* Sidebar: reduce left/right gutter so items align closer to the edge */
+        body:not(.g-sidenav-pinned) .sidenav.fixed-start ~ .main-content {
+            margin-left: 0 !important;
+        }
+
+        .nav-sidenav-toggle {
+            width: 2.25rem;
+            height: 2.25rem;
+            overflow: visible;
+        }
+
+        .nav-sidenav-toggle .sidenav-toggler-inner {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            width: 18px;
+            gap: 3px;
+        }
+
+        .nav-sidenav-toggle .sidenav-toggler-line {
+            display: block;
+            width: 18px;
+            height: 2px;
+            border-radius: 1px;
+            background: currentColor;
+            margin: 0;
+        }
+
+        .navbar-page-title {
+            align-items: center;
+        }
+
+        .navbar-breadcrumb-block h6 {
+            line-height: 1.2;
+        }
+
+        .navbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .theme-toggle-btn,
+        .nav-logout-btn,
+        .nav-sidenav-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 2rem;
+            line-height: 1;
+            padding: 0;
+            text-decoration: none;
+            box-shadow: none;
+        }
+
+        .theme-toggle-btn {
+            width: 2rem;
+            font-size: 1rem;
+        }
+
+        .nav-logout-btn {
+            gap: 0.375rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+            white-space: nowrap;
+        }
+
+        .navbar-vertical.navbar-expand-xs .navbar-nav {
+            padding-left: 0.25rem;
+            padding-right: 0.25rem;
+        }
+
         .navbar-vertical.navbar-expand-xs .navbar-nav .nav-link {
-            margin-left: -0.99rem;
-            margin-right: 0.15rem;
+            margin-left: 0;
+            margin-right: 0;
+            align-items: center;
+        }
+
+        .navbar-vertical.navbar-expand-xs .navbar-nav .nav-link .icon {
+            flex-shrink: 0;
+            align-self: center;
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            margin-top: 0;
+            box-shadow: none !important;
+        }
+
+        .navbar-vertical.navbar-expand-xs .navbar-nav .nav-link {
+            border-radius: 0.5rem;
+        }
+
+        .navbar-vertical.navbar-expand-xs .navbar-nav .nav-link .nav-link-text {
+            line-height: 1.25;
+        }
+
+        .navbar-actions .btn-dark.btn-sm {
+            padding: 0.45rem 1rem;
+            font-size: 0.75rem;
+            line-height: 1.4;
+        }
+
+        .dashboard-stat-card {
+            overflow: hidden;
         }
     </style>
 
@@ -139,11 +201,23 @@
                     'light';
             }
 
+            function syncThemeToggleIcons(isDark) {
+                document.querySelectorAll('.theme-toggle-btn').forEach(function(btn) {
+                    var moon = btn.querySelector('.theme-icon-moon');
+                    var sun = btn.querySelector('.theme-icon-sun');
+                    if (moon) moon.classList.toggle('d-none', isDark);
+                    if (sun) sun.classList.toggle('d-none', !isDark);
+                });
+                var checkbox = document.getElementById('theme-toggle');
+                if (checkbox) checkbox.checked = isDark;
+            }
+
             function applyTheme(theme) {
-                document.body.classList.toggle('theme-dark', theme === 'dark');
+                var isDark = theme === 'dark';
+                document.documentElement.setAttribute('data-theme', theme);
+                document.body.classList.toggle('theme-dark', isDark);
                 localStorage.setItem('theme', theme);
-                var toggle = document.getElementById('theme-toggle');
-                if (toggle) toggle.checked = theme === 'dark';
+                syncThemeToggleIcons(isDark);
             }
 
             window.__applyTheme = applyTheme;
@@ -162,9 +236,19 @@
                 }
             });
 
-            // If Livewire swaps the navbar, re-sync the toggle state.
+            if (window.matchMedia) {
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                    if (!localStorage.getItem('theme')) {
+                        applyTheme(e.matches ? 'dark' : 'light');
+                    }
+                });
+            }
+
             document.addEventListener('livewire:load', function() {
                 applyTheme(preferredTheme());
+            });
+            document.addEventListener('livewire:update', function() {
+                syncThemeToggleIcons(document.body.classList.contains('theme-dark'));
             });
         })();
     </script>

@@ -2,8 +2,8 @@
     <div class="container-fluid py-4">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <div>
-                <h4 class="mb-0">{{ $companyName }}</h4>
-                <div class="text-sm text-muted">Company dashboard</div>
+                <h4 class="mb-1">{{ $companyName }}</h4>
+                <div class="text-sm text-muted mb-1">Company dashboard</div>
             </div>
             <div class="d-flex gap-2">
                 <a href="{{ route('view-companies') }}" class="btn btn-sm btn-outline-dark">Switch Company</a>
@@ -20,49 +20,49 @@
         @endif
 
         <div class="row row-cols-2 row-cols-md-3 row-cols-xl-6 g-3 mb-4">
-            <div class="col mb-0">
-                <a class="card h-100" href="{{ $companyId ? route('view-employee-details', ['company_id' => $companyId]) : '#' }}">
-                    <div class="card-body p-3">
+            <div class="col">
+                <a class="card dashboard-stat-card h-100 text-decoration-none" href="{{ $companyId ? route('view-employee-details', ['company_id' => $companyId]) : '#' }}">
+                    <div class="card-body p-4">
                         <div class="text-sm text-muted">Total Employees</div>
                         <div class="h5 mb-0">{{ $stats['total_employees'] ?? 0 }}</div>
                     </div>
                 </a>
             </div>
-            <div class="col mb-0">
-                <a class="card h-100" href="{{ $companyId ? route('view-employee-details', ['company_id' => $companyId]) : '#' }}">
-                    <div class="card-body p-3">
+            <div class="col">
+                <a class="card dashboard-stat-card h-100 text-decoration-none" href="{{ $companyId ? route('view-employee-details', ['company_id' => $companyId]) : '#' }}">
+                    <div class="card-body p-4">
                         <div class="text-sm text-muted">Active Employees</div>
                         <div class="h5 mb-0">{{ $stats['active_employees'] ?? 0 }}</div>
                     </div>
                 </a>
             </div>
-            <div class="col mb-0">
-                <a class="card h-100" href="{{ $companyId ? route('view-employee-details', ['company_id' => $companyId]) : '#' }}">
-                    <div class="card-body p-3">
+            <div class="col">
+                <a class="card dashboard-stat-card h-100 text-decoration-none" href="{{ $companyId ? route('view-employee-details', ['company_id' => $companyId]) : '#' }}">
+                    <div class="card-body p-4">
                         <div class="text-sm text-muted">Under PF</div>
                         <div class="h5 mb-0">{{ $stats['pf_employees'] ?? 0 }}</div>
                     </div>
                 </a>
             </div>
-            <div class="col mb-0">
-                <a class="card h-100" href="{{ $companyId ? route('view-employee-details', ['company_id' => $companyId]) : '#' }}">
-                    <div class="card-body p-3">
+            <div class="col">
+                <a class="card dashboard-stat-card h-100 text-decoration-none" href="{{ $companyId ? route('view-employee-details', ['company_id' => $companyId]) : '#' }}">
+                    <div class="card-body p-4">
                         <div class="text-sm text-muted">Under ESI</div>
                         <div class="h5 mb-0">{{ $stats['esi_employees'] ?? 0 }}</div>
                     </div>
                 </a>
             </div>
-            <div class="col mb-0">
-                <div class="card h-100">
-                    <div class="card-body p-3">
+            <div class="col">
+                <div class="card dashboard-stat-card h-100">
+                    <div class="card-body p-4">
                         <div class="text-sm text-muted">Departments</div>
                         <div class="h5 mb-0">{{ $stats['departments'] ?? 0 }}</div>
                     </div>
                 </div>
             </div>
-            <div class="col mb-0">
-                <div class="card h-100">
-                    <div class="card-body p-3">
+            <div class="col">
+                <div class="card dashboard-stat-card h-100">
+                    <div class="card-body p-4">
                         <div class="text-sm text-muted">Locations</div>
                         <div class="h5 mb-0">{{ $stats['locations'] ?? 0 }}</div>
                     </div>
@@ -77,7 +77,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <h6 class="mb-0">Recent Employees</h6>
                             @if($companyId)
-                                <a class="text-sm" href="{{ route('view-employee-details', ['company_id' => $companyId]) }}">View all</a>
+                                <a class="text-sm text-primary" href="{{ route('view-employee-details', ['company_id' => $companyId]) }}">View all</a>
                             @endif
                         </div>
                     </div>

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AiConversation;
 use App\Models\Company;
 use App\Models\Department;
 use App\Models\Designation;
@@ -10,6 +11,7 @@ use App\Models\Location;
 use App\Models\MonthlyAttendance;
 use App\Models\User;
 use App\Services\Ai\AgentOrchestrator;
+use App\Services\Ai\ExcelPreviewService;
 use App\Services\Ai\OpenRouterClient;
 use App\Services\Ai\ToolRegistry;
 use App\Services\Ai\Tools\AttendanceToolProvider;
@@ -18,6 +20,7 @@ use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
+use RuntimeException;
 use Tests\TestCase;
 
 class AiAttendanceAgentTest extends TestCase
@@ -222,7 +225,7 @@ class AiAttendanceAgentTest extends TestCase
 
         $registry = new ToolRegistry();
         $registry->registerMany(AttendanceToolProvider::tools());
-        $orchestrator = new AgentOrchestrator($mockClient, $registry);
+        $orchestrator = new AgentOrchestrator($mockClient, $registry, app(ExcelPreviewService::class));
 
         $result = $orchestrator->sendMessage(
             $this->company->id,
@@ -253,6 +256,228 @@ class AiAttendanceAgentTest extends TestCase
 
         $this->assertSame(1, $result['created']);
         $this->assertSame(0, $result['failed']);
+    }
+
+    public function test_agent_receives_excel_preview_with_user_prompt(): void
+    {
+        $path = sys_get_temp_dir() . '/attendance-' . uniqid('', true) . '.xlsx';
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray([
+            ['employee_code', 'month', 'year', 'cl', 'tot_dys'],
+            ['EMP001', 6, 2026, 2, 30],
+        ]);
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($path);
+
+        $mockClient = Mockery::mock(OpenRouterClient::class);
+        $mockClient->shouldReceive('chat')
+            ->once()
+            ->withArgs(function (array $messages) use ($path) {
+                $lastUser = collect($messages)->reverse()->first(fn ($message) => $message['role'] === 'user');
+
+                return str_contains($lastUser['content'], 'Update attendance from this file')
+                    && str_contains($lastUser['content'], 'EMP001')
+                    && str_contains($lastUser['content'], $path);
+            })
+            ->andReturn(['content' => 'I can see the attendance rows in your file.']);
+
+        $registry = new ToolRegistry();
+        $registry->registerMany(AttendanceToolProvider::tools());
+        $orchestrator = new AgentOrchestrator($mockClient, $registry, app(ExcelPreviewService::class));
+
+        $result = $orchestrator->sendMessage(
+            $this->company->id,
+            $this->user->id,
+            'Update attendance from this file',
+            null,
+            $path,
+        );
+
+        $this->assertStringContainsString('attendance rows', strtolower($result['reply']));
+
+        @unlink($path);
+    }
+
+    public function test_import_attendance_excel_tool(): void
+    {
+        $path = sys_get_temp_dir() . '/attendance-import-' . uniqid('', true) . '.xlsx';
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray([
+            ['employee_code', 'month', 'year', 'cl', 'tot_dys'],
+            ['EMP001', 6, 2026, 2, 30],
+        ]);
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($path);
+
+        $tool = collect(AttendanceToolProvider::tools())->first(fn ($t) => $t->name() === 'import_attendance_excel');
+        $result = $tool->handle(['file_path' => $path], $this->company->id, $this->user->id);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(1, $result['created']);
+        $this->assertDatabaseHas('attendance', [
+            'employee_id' => $this->employee->id,
+            'casual_leave' => 2,
+            'total_days' => 30,
+        ]);
+
+        @unlink($path);
+    }
+
+    public function test_follow_up_message_keeps_excel_from_conversation(): void
+    {
+        $path = sys_get_temp_dir() . '/attendance-persist-' . uniqid('', true) . '.xlsx';
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray([
+            ['employee_code', 'cl', 'tot_dys'],
+            ['EMP001', 2, 30],
+        ]);
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($path);
+
+        $mockClient = Mockery::mock(OpenRouterClient::class);
+        $registry = new ToolRegistry();
+        $registry->registerMany(AttendanceToolProvider::tools());
+        $orchestrator = new AgentOrchestrator($mockClient, $registry, app(ExcelPreviewService::class));
+
+        $mockClient->shouldReceive('chat')
+            ->once()
+            ->andReturn(['content' => 'Which month and year?']);
+
+        $first = $orchestrator->sendMessage(
+            $this->company->id,
+            $this->user->id,
+            'Update the attendance',
+            null,
+            $path,
+        );
+
+        $mockClient->shouldReceive('chat')
+            ->once()
+            ->withArgs(function (array $messages) use ($path) {
+                $lastUser = collect($messages)->reverse()->first(fn ($message) => $message['role'] === 'user');
+
+                return str_contains($lastUser['content'], '06/2026')
+                    && str_contains($lastUser['content'], 'EMP001')
+                    && str_contains($lastUser['content'], $path)
+                    && str_contains($lastUser['content'], 'month=6 year=2026');
+            })
+            ->andReturn(['content' => 'Importing attendance for June 2026.']);
+
+        $second = $orchestrator->sendMessage(
+            $this->company->id,
+            $this->user->id,
+            '06/2026',
+            $first['conversation_id'],
+        );
+
+        $this->assertStringContainsString('june 2026', strtolower($second['reply']));
+        $this->assertSame($path, AiConversation::find($first['conversation_id'])?->pending_excel_path);
+
+        @unlink($path);
+    }
+
+    public function test_import_attendance_excel_applies_default_month_year(): void
+    {
+        $path = sys_get_temp_dir() . '/attendance-defaults-' . uniqid('', true) . '.xlsx';
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray([
+            ['employee_code', 'cl', 'tot_dys'],
+            ['EMP001', 3, 30],
+        ]);
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($path);
+
+        $tool = collect(AttendanceToolProvider::tools())->first(fn ($t) => $t->name() === 'import_attendance_excel');
+        $result = $tool->handle([
+            'file_path' => $path,
+            'month' => 6,
+            'year' => 2026,
+        ], $this->company->id, $this->user->id);
+
+        $this->assertTrue($result['success']);
+        $this->assertDatabaseHas('attendance', [
+            'employee_id' => $this->employee->id,
+            'month' => 6,
+            'year' => 2026,
+            'casual_leave' => 3,
+        ]);
+
+        @unlink($path);
+    }
+
+    public function test_direct_import_fallback_when_provider_fails(): void
+    {
+        $path = sys_get_temp_dir() . '/attendance-fallback-' . uniqid('', true) . '.xlsx';
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray([
+            ['employee_code', 'cl', 'tot_dys'],
+            ['EMP001', 2, 30],
+        ]);
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($path);
+
+        $mockClient = Mockery::mock(OpenRouterClient::class);
+        $registry = new ToolRegistry();
+        $registry->registerMany(AttendanceToolProvider::tools());
+        $orchestrator = new AgentOrchestrator($mockClient, $registry, app(ExcelPreviewService::class));
+
+        $mockClient->shouldReceive('chat')
+            ->once()
+            ->andReturn(['content' => 'Which month and year?']);
+
+        $first = $orchestrator->sendMessage(
+            $this->company->id,
+            $this->user->id,
+            'Update the attendance',
+            null,
+            $path,
+        );
+
+        $mockClient->shouldReceive('chat')
+            ->once()
+            ->andThrow(new RuntimeException('AI service error: Provider returned error'));
+
+        $second = $orchestrator->sendMessage(
+            $this->company->id,
+            $this->user->id,
+            '06/2026',
+            $first['conversation_id'],
+        );
+
+        $this->assertStringContainsString('attendance imported', strtolower($second['reply']));
+        $this->assertDatabaseHas('attendance', [
+            'employee_id' => $this->employee->id,
+            'month' => 6,
+            'year' => 2026,
+            'casual_leave' => 2,
+        ]);
+
+        @unlink($path);
+    }
+
+    public function test_import_attendance_excel_with_employee_id_column_as_empno(): void
+    {
+        $path = sys_get_temp_dir() . '/attendance-empno-' . uniqid('', true) . '.xlsx';
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray([
+            ['employee_id', 'month', 'year', 'cl', 'tot_dys'],
+            ['EMP001', 6, 2026, 2, 30],
+        ]);
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($path);
+
+        $tool = collect(AttendanceToolProvider::tools())->first(fn ($t) => $t->name() === 'import_attendance_excel');
+        $result = $tool->handle(['file_path' => $path], $this->company->id, $this->user->id);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(1, $result['created']);
+        $this->assertDatabaseHas('attendance', [
+            'employee_id' => $this->employee->id,
+            'casual_leave' => 2,
+            'total_days' => 30,
+        ]);
+
+        @unlink($path);
     }
 
     protected function tearDown(): void

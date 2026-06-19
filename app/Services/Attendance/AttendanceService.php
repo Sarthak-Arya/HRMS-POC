@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use Maatwebsite\Excel\Facades\Excel;
 
 class AttendanceService
 {
@@ -78,11 +79,8 @@ class AttendanceService
     {
         $validated = $this->validateAgentData($companyId, $data, true);
 
-        $employee = app(EmployeeService::class)->findForCompany(
-            $companyId,
-            $validated['employee_id'] ?? null,
-            $validated['employee_code'] ?? null,
-        );
+        [$employeeId, $employeeCode] = app(EmployeeService::class)->resolveEmployeeIdentifier($validated);
+        $employee = app(EmployeeService::class)->findForCompany($companyId, $employeeId, $employeeCode);
 
         if (!$employee) {
             throw ValidationException::withMessages(['employee' => 'Employee not found.']);
@@ -112,6 +110,80 @@ class AttendanceService
             'action' => $existing ? 'updated' : 'created',
             'attendance' => $this->toSummary($record),
         ];
+    }
+
+    /**
+     * @return array{created: int, updated: int, failed: int, skipped: int, errors: array<int, string>}
+     */
+    public function importFromExcel(int $companyId, string $filePath, ?int $defaultMonth = null, ?int $defaultYear = null): array
+    {
+        if (!Schema::hasTable('attendance')) {
+            return [
+                'created' => 0,
+                'updated' => 0,
+                'failed' => 1,
+                'skipped' => 0,
+                'errors' => [0 => 'Attendance table is not configured.'],
+            ];
+        }
+
+        $rows = Excel::toArray(null, $filePath)[0] ?? [];
+        if (empty($rows)) {
+            return [
+                'created' => 0,
+                'updated' => 0,
+                'failed' => 1,
+                'skipped' => 0,
+                'errors' => [0 => 'Excel file is empty.'],
+            ];
+        }
+
+        $header = array_map(fn ($value) => $this->normalizeImportHeader((string) $value), $rows[0]);
+        unset($rows[0]);
+
+        $created = 0;
+        $updated = 0;
+        $failed = 0;
+        $skipped = 0;
+        $errors = [];
+
+        foreach ($rows as $index => $row) {
+            $data = $this->mapImportRow($header, $row);
+            if (empty($data['month']) && $defaultMonth !== null) {
+                $data['month'] = $defaultMonth;
+            }
+            if (empty($data['year']) && $defaultYear !== null) {
+                $data['year'] = $defaultYear;
+            }
+
+            if ($this->importRowIsEmpty($data)) {
+                $skipped++;
+                continue;
+            }
+
+            if (empty($data['month']) || empty($data['year'])) {
+                $failed++;
+                $errors[$index + 2] = 'Month and year are required for each row (or provide defaults).';
+                continue;
+            }
+
+            try {
+                $result = $this->upsertFromAgent($companyId, $data);
+                if ($result['action'] === 'created') {
+                    $created++;
+                } else {
+                    $updated++;
+                }
+            } catch (ValidationException $e) {
+                $failed++;
+                $errors[$index + 2] = collect($e->errors())->flatten()->first() ?? 'Validation failed.';
+            } catch (\Throwable $e) {
+                $failed++;
+                $errors[$index + 2] = $e->getMessage();
+            }
+        }
+
+        return compact('created', 'updated', 'failed', 'skipped', 'errors');
     }
 
     /**
@@ -218,7 +290,12 @@ class AttendanceService
         $validator = Validator::make($normalized, $rules);
 
         $validator->after(function ($validator) use ($normalized, $requireEmployee) {
-            if ($requireEmployee && empty($normalized['employee_id']) && empty($normalized['employee_code'])) {
+            if (!$requireEmployee) {
+                return;
+            }
+
+            [$employeeId, $employeeCode] = app(EmployeeService::class)->resolveEmployeeIdentifier($normalized);
+            if ($employeeId === null && $employeeCode === null) {
                 $validator->errors()->add('employee', 'employee_id or employee_code is required.');
             }
         });
@@ -264,7 +341,75 @@ class AttendanceService
             $normalized['deductions'] = array_values($normalized['deductions']);
         }
 
+        [$employeeId, $employeeCode] = app(EmployeeService::class)->resolveEmployeeIdentifier($normalized);
+        unset($normalized['employee_id'], $normalized['employee_code']);
+        if ($employeeId !== null) {
+            $normalized['employee_id'] = $employeeId;
+        }
+        if ($employeeCode !== null) {
+            $normalized['employee_code'] = $employeeCode;
+        }
+
         return $normalized;
+    }
+
+    /**
+     * @param array<int, string> $header
+     * @param array<int, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function mapImportRow(array $header, array $row): array
+    {
+        $data = [];
+        foreach ($header as $index => $column) {
+            if ($column === '') {
+                continue;
+            }
+            $data[$column] = $row[$index] ?? null;
+        }
+
+        foreach (['month', 'year'] as $key) {
+            if (isset($data[$key])) {
+                $data[$key] = (int) $data[$key];
+            }
+        }
+
+        for ($i = 1; $i <= 50; $i++) {
+            $key = 'ded_' . $i;
+            if (!array_key_exists($key, $data)) {
+                break;
+            }
+            $data['deductions'] ??= [];
+            $data['deductions'][] = (float) ($data[$key] ?? 0);
+        }
+
+        return $data;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function importRowIsEmpty(array $data): bool
+    {
+        [$employeeId, $employeeCode] = app(EmployeeService::class)->resolveEmployeeIdentifier($data);
+
+        return $employeeId === null && $employeeCode === null;
+    }
+
+    private function normalizeImportHeader(string $header): string
+    {
+        $header = mb_strtolower(trim($header));
+        $header = preg_replace('/[\s\-]+/', '_', $header) ?? $header;
+
+        return match ($header) {
+            'casual_leave' => 'cl',
+            'earned_leave' => 'el',
+            'sick_leave' => 'sl',
+            'esi_la', 'esi_leave' => 'esi_leave',
+            'total_days' => 'tot_dys',
+            'empno', 'emp_no', 'employee_no', 'emp_code', 'company_code' => 'employee_code',
+            default => $header,
+        };
     }
 
     /**

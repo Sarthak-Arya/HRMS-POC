@@ -1,11 +1,11 @@
 <main class="main-content">
-    <div class="d-flex justify-content-center">
-        <form class="" role="search">
-            <input wire:keyup="searchCompanies" wire:model.live="searchString" class="form-control me-2" type="search"
-                placeholder="Search" aria-label="Search">
+    <div class="d-flex justify-content-center py-3">
+        <form class="w-100" style="max-width: 420px;" role="search">
+            <input wire:keyup="searchCompanies" wire:model.live="searchString" class="form-control" type="search"
+                placeholder="Search companies..." aria-label="Search">
         </form>
     </div>
-    <div wire:model="searchedCompanies" class="container p-4">
+    <div wire:model="searchedCompanies" class="container py-2 pb-5">
         <div class="row g-4">
         @foreach ($searchedCompanies as $company)
             <div class="col-lg-4 col-md-6 col-sm-12 d-flex align-items-stretch">

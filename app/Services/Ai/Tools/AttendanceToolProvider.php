@@ -20,6 +20,7 @@ class AttendanceToolProvider
             new GetAttendanceTool(),
             new UpsertAttendanceTool(),
             new BulkUpsertAttendanceTool(),
+            new ImportAttendanceExcelTool(),
         ];
     }
 }
@@ -137,7 +138,8 @@ class GetAttendanceTool implements AiTool
             return $denied;
         }
 
-        if (empty($args['employee_id']) && empty($args['employee_code'])) {
+        [$employeeId, $employeeCode] = app(\App\Services\Employee\EmployeeService::class)->resolveEmployeeIdentifier($args);
+        if ($employeeId === null && $employeeCode === null) {
             return ['success' => false, 'error' => 'employee_id or employee_code is required.'];
         }
 
@@ -152,8 +154,8 @@ class GetAttendanceTool implements AiTool
             $companyId,
             $month,
             $year,
-            isset($args['employee_id']) ? (int) $args['employee_id'] : null,
-            $args['employee_code'] ?? null,
+            $employeeId,
+            $employeeCode,
         );
 
         if (!$record) {
@@ -215,7 +217,8 @@ class UpsertAttendanceTool implements AiTool
             return $denied;
         }
 
-        if (empty($args['employee_id']) && empty($args['employee_code'])) {
+        [$employeeId, $employeeCode] = app(\App\Services\Employee\EmployeeService::class)->resolveEmployeeIdentifier($args);
+        if ($employeeId === null && $employeeCode === null) {
             return ['success' => false, 'error' => 'employee_id or employee_code is required.'];
         }
 
@@ -298,6 +301,66 @@ class BulkUpsertAttendanceTool implements AiTool
             'updated' => $result['updated'],
             'failed' => $result['failed'],
             'errors' => $result['errors'],
+        ];
+    }
+
+    public function isMutating(): bool
+    {
+        return true;
+    }
+}
+
+class ImportAttendanceExcelTool implements AiTool
+{
+    use ChecksAttendancePermission;
+
+    public function name(): string
+    {
+        return 'import_attendance_excel';
+    }
+
+    public function schema(): array
+    {
+        return [
+            'name' => $this->name(),
+            'description' => 'Import monthly attendance from an uploaded Excel file. Pass file_path only — employee codes/IDs in the file are read as-is; do not rewrite rows with bulk_upsert_attendance.',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'file_path' => ['type' => 'string', 'description' => 'Absolute path to the uploaded Excel file'],
+                    'month' => ['type' => 'integer', 'description' => 'Default month (1-12) when rows omit month'],
+                    'year' => ['type' => 'integer', 'description' => 'Default year when rows omit year'],
+                ],
+                'required' => ['file_path'],
+            ],
+        ];
+    }
+
+    public function handle(array $args, int $companyId, int $userId): array
+    {
+        if ($denied = $this->assertCanManageAttendance($userId)) {
+            return $denied;
+        }
+
+        $filePath = $args['file_path'] ?? '';
+        if ($filePath === '' || !file_exists($filePath)) {
+            return ['success' => false, 'error' => 'Excel file not found. Please upload a file first.'];
+        }
+
+        $result = app(AttendanceService::class)->importFromExcel(
+            $companyId,
+            $filePath,
+            isset($args['month']) ? (int) $args['month'] : null,
+            isset($args['year']) ? (int) $args['year'] : null,
+        );
+
+        return [
+            'success' => $result['failed'] === 0,
+            'created' => $result['created'],
+            'updated' => $result['updated'],
+            'failed' => $result['failed'],
+            'skipped' => $result['skipped'],
+            'errors' => array_slice($result['errors'], 0, 20, true),
         ];
     }
 

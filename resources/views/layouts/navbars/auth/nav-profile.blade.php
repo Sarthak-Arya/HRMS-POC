@@ -16,11 +16,10 @@
                         <input type="text" class="form-control" placeholder="Type here...">
                     </div>
                 </div>
-                <ul class="navbar-nav justify-content-end">
-                    <li class="nav-item d-flex align-items-center">
-                        <a href="javascript:;" class="nav-link text-body font-weight-bold px-0">
-                            <livewire:auth.logout />
-                        </a>
+                <ul class="navbar-nav justify-content-end align-items-center flex-row">
+                    <x-theme-toggle btn-class="text-white" />
+                    <li class="nav-item d-flex align-items-center mb-0">
+                        <livewire:auth.logout />
                     </li>
                     <li class="nav-item d-xl-none ps-3 pe-0 d-flex align-items-center">
                         <a href="javascript:;" class="nav-link text-white p-0">

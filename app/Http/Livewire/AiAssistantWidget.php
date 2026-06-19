@@ -30,6 +30,15 @@ class AiAssistantWidget extends Component
     /** @var bool Whether the agent is currently processing a message. */
     public bool $isProcessing = false;
 
+    /** @var bool Whether a queued user message still needs AI processing. */
+    public bool $shouldProcess = false;
+
+    /** @var string Text queued for the next AI request. */
+    public string $pendingMessageText = '';
+
+    /** @var string|null Path to an Excel file queued for the next AI request. */
+    public ?string $pendingExcelPath = null;
+
     /** @var string|null An error message to display in the UI. */
     public ?string $errorMessage = null;
 
@@ -90,6 +99,10 @@ class AiAssistantWidget extends Component
      */
     public function sendMessage(): void
     {
+        if ($this->isProcessing) {
+            return;
+        }
+
         $text = trim($this->input);
         if ($text === '' && !$this->excelFile) {
             return;
@@ -100,21 +113,52 @@ class AiAssistantWidget extends Component
             return;
         }
 
-        $this->isProcessing = true;
         $this->errorMessage = null;
         $this->statusMessage = null;
 
         $excelPath = null;
+        $excelFileName = null;
         if ($this->excelFile) {
+            $excelFileName = $this->excelFile->getClientOriginalName();
             $stored = $this->excelFile->store('ai-imports', 'local');
             $excelPath = storage_path('app/' . $stored);
             if ($text === '') {
-                $text = 'Please import the uploaded employee Excel file.';
+                $text = 'Process the attached Excel file as described in my request.';
             }
         }
 
-        $this->messages[] = ['role' => 'user', 'content' => $text];
+        $displayMessage = $text;
+        if ($excelFileName) {
+            $displayMessage = trim($text) . "\n\n📎 " . $excelFileName;
+        }
+
+        $this->messages[] = ['role' => 'user', 'content' => $displayMessage];
+        $this->pendingMessageText = $text;
+        $this->pendingExcelPath = $excelPath;
         $this->input = '';
+        $this->excelFile = null;
+        $this->isProcessing = true;
+        $this->shouldProcess = true;
+    }
+
+    /**
+     * Process the queued user message with the AI orchestrator.
+     * Triggered after sendMessage() renders so the UI updates immediately.
+     *
+     * @return void
+     */
+    public function processMessage(): void
+    {
+        if (!$this->shouldProcess) {
+            return;
+        }
+
+        $this->shouldProcess = false;
+
+        $text = $this->pendingMessageText;
+        $excelPath = $this->pendingExcelPath;
+        $this->pendingMessageText = '';
+        $this->pendingExcelPath = null;
 
         try {
             $orchestrator = app(AgentOrchestrator::class);
@@ -136,7 +180,6 @@ class AiAssistantWidget extends Component
             ];
         } finally {
             $this->isProcessing = false;
-            $this->excelFile = null;
         }
     }
 
@@ -163,6 +206,9 @@ class AiAssistantWidget extends Component
         $this->errorMessage = null;
         $this->input = '';
         $this->isProcessing = false;
+        $this->shouldProcess = false;
+        $this->pendingMessageText = '';
+        $this->pendingExcelPath = null;
         $this->excelFile = null;
         $this->statusMessage = 'New conversation started.';
 
@@ -202,6 +248,9 @@ class AiAssistantWidget extends Component
         $this->errorMessage = null;
         $this->input = '';
         $this->isProcessing = false;
+        $this->shouldProcess = false;
+        $this->pendingMessageText = '';
+        $this->pendingExcelPath = null;
         $this->excelFile = null;
         $this->statusMessage = null;
         $this->showHistory = false;

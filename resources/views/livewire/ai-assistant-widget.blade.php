@@ -75,8 +75,8 @@
                     @if(empty($messages))
                         <div class="text-center text-muted py-4">
                             <i class="fas fa-comments fa-2x mb-2"></i>
-                            <p class="mb-0 small">Ask me to add, update, search employees or import Excel.</p>
-                            <p class="mb-0 small text-secondary">मुझसे कर्मचारी जोड़ने, अपडेट करने या Excel import करने को कहें।</p>
+                            <p class="mb-0 small">Ask me to add, update, search employees, attendance, or attach an Excel file.</p>
+                            <p class="mb-0 small text-secondary">कर्मचारी/हाजिरी अपडेट करें या Excel फ़ाइल संलग्न करें।</p>
                         </div>
                     @endif
 
@@ -89,7 +89,9 @@
                     @endforeach
 
                     @if($isProcessing)
-                        <div class="ai-message ai-message-assistant mb-2">
+                        <div class="ai-message ai-message-assistant mb-2"
+                            wire:key="ai-processing-{{ count($messages) }}"
+                            @if($shouldProcess) wire:init="processMessage" @endif>
                             <div class="ai-message-bubble">
                                 <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                                 Thinking...
@@ -132,14 +134,22 @@
                         <button type="button"
                             class="ai-action-btn ai-action-btn-send"
                             wire:click="sendMessage"
+                            wire:loading.attr="disabled"
+                            wire:target="sendMessage"
                             title="Send message"
                             @if($isProcessing) disabled @endif>
-                            <i class="fas fa-paper-plane"></i>
+                            <span wire:loading.remove wire:target="sendMessage">
+                                <i class="fas fa-paper-plane"></i>
+                            </span>
+                            <span wire:loading wire:target="sendMessage">
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                            </span>
                         </button>
                     </div>
                     @if($excelFile)
                         <small class="text-success d-block mt-2">
-                            <i class="fas fa-check"></i> File ready — send to import
+                            <i class="fas fa-check"></i>
+                            {{ $excelFile->getClientOriginalName() }} — add your instruction and send
                         </small>
                     @endif
                     <div wire:loading wire:target="excelFile" class="small text-muted mt-1">Uploading file...</div>
@@ -211,17 +221,17 @@
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
-            background: #f1f3f5;
-            border-right: 1px solid #e9ecef;
+            background: var(--hrms-ai-sidebar-bg, #f1f3f5);
+            border-right: 1px solid var(--hrms-border-color, #e9ecef);
             min-height: 0;
         }
         .ai-new-chat-btn {
             margin: 10px;
             padding: 8px 12px;
-            border: 1px solid #dee2e6;
+            border: 1px solid var(--hrms-border-color, #dee2e6);
             border-radius: 8px;
-            background: #fff;
-            color: #344767;
+            background: var(--hrms-card-bg, #fff);
+            color: var(--hrms-text-primary, #344767);
             font-size: 0.8125rem;
             font-weight: 600;
             text-align: left;
@@ -229,7 +239,7 @@
             transition: background 0.15s ease, border-color 0.15s ease;
         }
         .ai-new-chat-btn:hover {
-            background: #e8f1ff;
+            background: var(--hrms-ai-active-bg, #e8f1ff);
             border-color: #0052ff;
             color: #0052ff;
         }
@@ -243,7 +253,7 @@
             padding: 12px 8px;
             margin: 0;
             font-size: 0.8125rem;
-            color: #8392ab;
+            color: var(--hrms-text-muted, #8392ab);
             text-align: center;
         }
         .ai-history-item {
@@ -254,13 +264,13 @@
             margin-bottom: 2px;
         }
         .ai-history-item.active {
-            background: #e8f1ff;
+            background: var(--hrms-ai-active-bg, #e8f1ff);
         }
         .ai-history-item:hover {
-            background: #e9ecef;
+            background: var(--hrms-hover-bg, #e9ecef);
         }
         .ai-history-item.active:hover {
-            background: #dce8ff;
+            background: var(--hrms-ai-active-bg, #dce8ff);
         }
         .ai-history-link {
             flex: 1;
@@ -275,7 +285,7 @@
             display: block;
             font-size: 0.8125rem;
             font-weight: 600;
-            color: #344767;
+            color: var(--hrms-text-primary, #344767);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -283,7 +293,7 @@
         .ai-history-time {
             display: block;
             font-size: 0.6875rem;
-            color: #8392ab;
+            color: var(--hrms-text-muted, #8392ab);
             margin-top: 2px;
         }
         .ai-history-delete {
@@ -294,7 +304,7 @@
             border: none;
             border-radius: 6px;
             background: transparent;
-            color: #8392ab;
+            color: var(--hrms-text-muted, #8392ab);
             opacity: 0;
             cursor: pointer;
             transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
@@ -351,12 +361,12 @@
         .ai-status-banner {
             flex-shrink: 0;
             padding: 8px 12px;
-            background: #e8f1ff;
-            color: #0052ff;
+            background: var(--hrms-ai-status-bg, #e8f1ff);
+            color: var(--hrms-ai-status-text, #0052ff);
             font-size: 0.8125rem;
             font-weight: 600;
             text-align: center;
-            border-bottom: 1px solid #d0e2ff;
+            border-bottom: 1px solid var(--hrms-ai-status-border, #d0e2ff);
         }
         .ai-header-btn {
             width: 32px;
@@ -380,17 +390,17 @@
             min-height: 0;
             overflow-y: auto;
             overflow-x: hidden;
-            background: #f8f9fa;
+            background: var(--hrms-ai-messages-bg, #f8f9fa);
         }
         .ai-assistant-footer {
             flex-shrink: 0;
             padding: 12px;
-            background: #fff;
+            background: var(--hrms-card-bg, #fff);
         }
         .ai-lang-tabs {
             display: flex;
             width: 100%;
-            border: 1px solid #dee2e6;
+            border: 1px solid var(--hrms-border-color, #dee2e6);
             border-radius: 8px;
             overflow: hidden;
         }
@@ -398,8 +408,8 @@
             flex: 1;
             padding: 6px 8px;
             border: none;
-            background: #fff;
-            color: #67748e;
+            background: var(--hrms-card-bg, #fff);
+            color: var(--hrms-text-secondary, #67748e);
             font-size: 0.75rem;
             font-weight: 600;
             text-transform: none;
@@ -408,7 +418,7 @@
             transition: background 0.15s ease, color 0.15s ease;
         }
         .ai-lang-tab + .ai-lang-tab {
-            border-left: 1px solid #dee2e6;
+            border-left: 1px solid var(--hrms-border-color, #dee2e6);
         }
         .ai-lang-tab.active {
             background: linear-gradient(180deg, #0052ff 0%, #0072ff 100%);
@@ -418,7 +428,9 @@
             width: 100%;
             margin-top: 8px;
             border-radius: 8px;
-            border: 1px solid #dee2e6;
+            border: 1px solid var(--hrms-border-color, #dee2e6);
+            background: var(--hrms-input-bg, #fff);
+            color: var(--hrms-text-primary, #344767);
             font-size: 0.875rem;
             resize: none;
             box-shadow: none;
@@ -438,10 +450,10 @@
             height: 36px;
             min-width: 36px;
             padding: 0;
-            border: 1px solid #dee2e6;
+            border: 1px solid var(--hrms-border-color, #dee2e6);
             border-radius: 8px;
-            background: #fff;
-            color: #67748e;
+            background: var(--hrms-card-bg, #fff);
+            color: var(--hrms-text-secondary, #67748e);
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -452,8 +464,8 @@
             transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
         }
         .ai-action-btn:hover {
-            background: #f8f9fa;
-            border-color: #ced4da;
+            background: var(--hrms-hover-bg, #f8f9fa);
+            border-color: var(--hrms-input-border, #ced4da);
             transform: none;
         }
         .ai-action-btn-send {
@@ -494,9 +506,9 @@
             border-bottom-right-radius: 4px;
         }
         .ai-message-assistant .ai-message-bubble {
-            background: #fff;
-            color: #344767;
-            border: 1px solid #e9ecef;
+            background: var(--hrms-ai-bubble-bg, #fff);
+            color: var(--hrms-text-primary, #344767);
+            border: 1px solid var(--hrms-border-color, #e9ecef);
             border-bottom-left-radius: 4px;
         }
         #ai-voice-btn.listening {

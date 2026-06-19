@@ -1,20 +1,19 @@
 <style>
-
-    .card {
-        background-color: white;
+    .employee-card .card {
+        background-color: var(--hrms-card-bg, #ffffff);
         border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 2px 4px var(--hrms-shadow, rgba(0, 0, 0, 0.1));
         padding: 20px;
         width: 300px;
+        color: var(--hrms-text-primary, #344767);
     }
 
-    .card-header {
+    .employee-card .card-header {
         display: flex;
         align-items: center;
-        /* margin-bottom: 5px; */
     }
 
-    .profile-pic {
+    .employee-card .profile-pic {
         width: 60px;
         height: 60px;
         border-radius: 50%;
@@ -22,46 +21,45 @@
         margin-right: 15px;
     }
 
-    .name {
+    .employee-card .name {
         font-size: 18px;
         font-weight: bold;
         margin: 0;
     }
 
-    .job-title {
-        color: #666;
-        /* margin: 5px 0 0; */
+    .employee-card .job-title {
+        color: var(--hrms-text-secondary, #666);
     }
 
-    .badges {
+    .employee-card .badges {
         display: flex;
         margin-bottom: 15px;
     }
 
-    .badge {
+    .employee-card .badge {
         font-size: 12px;
         padding: 5px 10px;
         border-radius: 15px;
         margin-right: 10px;
     }
 
-    .badge-purple {
+    .employee-card .badge-purple {
         background-color: #ffe6e6;
         color: red;
     }
 
-    .badge-gray {
-        background-color: #f0f0f0;
-        color: #666;
+    .employee-card .badge-gray {
+        background-color: var(--hrms-hover-bg, #f0f0f0);
+        color: var(--hrms-text-secondary, #666);
     }
 
-    .info {
+    .employee-card .info {
         font-size: 14px;
-        color: #666;
+        color: var(--hrms-text-secondary, #666);
         margin: 5px 0;
     }
 </style>
-<div>
+<div class="employee-card">
 
     <div class="card">
         <div class="card-header">

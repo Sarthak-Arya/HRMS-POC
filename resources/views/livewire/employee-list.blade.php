@@ -152,9 +152,9 @@
         padding: 0.5rem 0.75rem;
         margin-left: -1px;
         line-height: 1.25;
-        color: #344767;
-        background-color: #fff;
-        border: 1px solid #dee2e6;
+        color: var(--hrms-text-primary, #344767);
+        background-color: var(--hrms-card-bg, #fff);
+        border: 1px solid var(--hrms-border-color, #dee2e6);
     }
     .page-item.active .page-link {
         z-index: 3;
@@ -163,9 +163,9 @@
         border-color: #344767;
     }
     .page-item.disabled .page-link {
-        color: #6c757d;
+        color: var(--hrms-text-muted, #6c757d);
         pointer-events: none;
-        background-color: #fff;
-        border-color: #dee2e6;
+        background-color: var(--hrms-surface-bg, #fff);
+        border-color: var(--hrms-border-color, #dee2e6);
     }
 </style> 

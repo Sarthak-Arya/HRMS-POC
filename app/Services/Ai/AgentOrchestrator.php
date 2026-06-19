@@ -24,6 +24,7 @@ class AgentOrchestrator
     public function __construct(
         private OpenRouterClient $client,
         private ToolRegistry $registry,
+        private ExcelPreviewService $excelPreview,
     ) {}
 
     /**
@@ -54,10 +55,7 @@ class AgentOrchestrator
                 'title' => mb_substr($userMessage, 0, 80),
             ]);
 
-        $content = $userMessage;
-        if ($pendingExcelPath) {
-            $content .= "\n\n[System: User uploaded Excel file at path: {$pendingExcelPath}. Use import_employees_excel tool with this file_path.]";
-        }
+        $excelPath = $this->resolveExcelPath($conversation, $pendingExcelPath);
 
         AiMessage::create([
             'conversation_id' => $conversation->id,
@@ -66,11 +64,30 @@ class AgentOrchestrator
         ]);
 
         $messages = $this->buildMessages($conversation, $companyId);
+        $period = $this->resolveAttendancePeriod($conversation, $userMessage);
+        if ($excelPath) {
+            $messages = $this->enrichWithExcelContext($messages, $userMessage, $excelPath, $period);
+        }
 
         $maxRounds = config('ai.agent.max_tool_rounds');
 
         for ($round = 0; $round < $maxRounds; $round++) {
-            $response = $this->client->chat($messages, $this->registry->schemas());
+            try {
+                $response = $this->client->chat($messages, $this->registry->schemas());
+            } catch (RuntimeException $e) {
+                if ($fallback = $this->tryDirectAttendanceImport(
+                    $conversation,
+                    $excelPath,
+                    $period,
+                    $companyId,
+                    $userId,
+                    $userMessage,
+                )) {
+                    return $fallback;
+                }
+
+                throw $e;
+            }
 
             if (!empty($response['tool_calls'])) {
                 $messages[] = [
@@ -83,11 +100,22 @@ class AgentOrchestrator
                     $toolName = $toolCall['function']['name'] ?? '';
                     $args = json_decode($toolCall['function']['arguments'] ?? '{}', true) ?: [];
 
-                    if ($pendingExcelPath && $toolName === 'import_employees_excel' && empty($args['file_path'])) {
-                        $args['file_path'] = $pendingExcelPath;
+                    if ($excelPath && in_array($toolName, ['import_employees_excel', 'import_attendance_excel'], true)) {
+                        if (empty($args['file_path'])) {
+                            $args['file_path'] = $excelPath;
+                        }
+                        if ($toolName === 'import_attendance_excel' && $period) {
+                            $args['month'] ??= $period['month'];
+                            $args['year'] ??= $period['year'];
+                        }
                     }
 
                     $result = $this->executeTool($toolName, $args, $companyId, $userId);
+
+                    if ($excelPath && in_array($toolName, ['import_employees_excel', 'import_attendance_excel'], true) && ($result['success'] ?? false)) {
+                        $conversation->update(['pending_excel_path' => null]);
+                        $excelPath = null;
+                    }
 
                     AiMessage::create([
                         'conversation_id' => $conversation->id,
@@ -166,6 +194,190 @@ class AgentOrchestrator
         return $messages;
     }
 
+    private function resolveExcelPath(AiConversation $conversation, ?string $uploadedPath): ?string
+    {
+        if ($uploadedPath !== null && $uploadedPath !== '' && is_readable($uploadedPath)) {
+            $conversation->update(['pending_excel_path' => $uploadedPath]);
+
+            return $uploadedPath;
+        }
+
+        $storedPath = $conversation->pending_excel_path;
+        if ($storedPath && is_readable($storedPath)) {
+            return $storedPath;
+        }
+
+        if ($storedPath) {
+            $conversation->update(['pending_excel_path' => null]);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $messages
+     * @param array{month: int, year: int}|null $period
+     * @return array<int, array<string, mixed>>
+     */
+    private function enrichWithExcelContext(array $messages, string $userMessage, string $filePath, ?array $period): array
+    {
+        $previewText = $this->excelPreview->formatForPrompt($filePath);
+        $enriched = trim($userMessage) !== ''
+            ? trim($userMessage) . "\n\n[Uploaded Excel file]\n" . $previewText
+            : "[Uploaded Excel file]\n" . $previewText;
+
+        $enriched .= "\n\n[System: file_path for import tools: {$filePath}]";
+
+        if ($period) {
+            $enriched .= "\n[System: attendance period month={$period['month']} year={$period['year']}. Use import_attendance_excel with these defaults if rows omit month/year.]";
+        }
+
+        for ($i = count($messages) - 1; $i >= 0; $i--) {
+            if (($messages[$i]['role'] ?? '') === 'user') {
+                $messages[$i]['content'] = $enriched;
+                return $messages;
+            }
+        }
+
+        $messages[] = ['role' => 'user', 'content' => $enriched];
+
+        return $messages;
+    }
+
+    /**
+     * @return array{month: int, year: int}|null
+     */
+    private function resolveAttendancePeriod(AiConversation $conversation, string $currentMessage): ?array
+    {
+        if ($period = $this->parseMonthYear($currentMessage)) {
+            return $period;
+        }
+
+        foreach ($conversation->messages()->where('role', 'user')->orderByDesc('id')->limit(6)->get() as $message) {
+            if ($period = $this->parseMonthYear((string) ($message->content ?? ''))) {
+                return $period;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{reply: string, conversation_id: int}|null
+     */
+    private function tryDirectAttendanceImport(
+        AiConversation $conversation,
+        ?string $excelPath,
+        ?array $period,
+        int $companyId,
+        int $userId,
+        string $userMessage,
+    ): ?array {
+        if (!$excelPath || !$period || !is_readable($excelPath)) {
+            return null;
+        }
+
+        if (!$this->conversationWantsAttendanceImport($conversation, $userMessage)) {
+            return null;
+        }
+
+        try {
+            $preview = $this->excelPreview->preview($excelPath);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if ($preview['detected_type'] !== 'attendance') {
+            return null;
+        }
+
+        $result = $this->executeTool('import_attendance_excel', [
+            'file_path' => $excelPath,
+            'month' => $period['month'],
+            'year' => $period['year'],
+        ], $companyId, $userId);
+
+        if (!($result['success'] ?? false)) {
+            return null;
+        }
+
+        $conversation->update(['pending_excel_path' => null]);
+        $reply = $this->formatAttendanceImportReply($result, $period);
+
+        AiMessage::create([
+            'conversation_id' => $conversation->id,
+            'role' => 'assistant',
+            'content' => $reply,
+        ]);
+
+        return [
+            'reply' => $reply,
+            'conversation_id' => $conversation->id,
+        ];
+    }
+
+    private function conversationWantsAttendanceImport(AiConversation $conversation, string $currentMessage): bool
+    {
+        $needles = ['attendance', 'hajiri', 'हाजिरी', 'import', 'update', 'upload'];
+        $haystack = mb_strtolower($currentMessage);
+
+        foreach ($conversation->messages()->where('role', 'user')->orderByDesc('id')->limit(6)->get() as $message) {
+            $haystack .= ' ' . mb_strtolower((string) ($message->content ?? ''));
+        }
+
+        foreach ($needles as $needle) {
+            if (str_contains($haystack, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array{month: int, year: int} $period
+     * @param array<string, mixed> $result
+     */
+    private function formatAttendanceImportReply(array $result, array $period): string
+    {
+        $month = $period['month'];
+        $year = $period['year'];
+
+        return sprintf(
+            'Attendance imported for %02d/%d. Created: %d, updated: %d, failed: %d.',
+            $month,
+            $year,
+            (int) ($result['created'] ?? 0),
+            (int) ($result['updated'] ?? 0),
+            (int) ($result['failed'] ?? 0),
+        );
+    }
+
+    /**
+     * @return array{month: int, year: int}|null
+     */
+    private function parseMonthYear(string $text): ?array
+    {
+        if (preg_match('/\b(0?[1-9]|1[0-2])\s*[\/\-\.]\s*(20\d{2})\b/', $text, $matches)) {
+            return ['month' => (int) $matches[1], 'year' => (int) $matches[2]];
+        }
+
+        if (preg_match('/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(20\d{2})\b/i', $text, $matches)) {
+            $months = [
+                'january' => 1, 'february' => 2, 'march' => 3, 'april' => 4,
+                'may' => 5, 'june' => 6, 'july' => 7, 'august' => 8,
+                'september' => 9, 'october' => 10, 'november' => 11, 'december' => 12,
+            ];
+
+            return [
+                'month' => $months[strtolower($matches[1])],
+                'year' => (int) $matches[2],
+            ];
+        }
+
+        return null;
+    }
+
     /**
      * Generate the system prompt for the AI agent.
      *
@@ -185,16 +397,18 @@ You can manage employees using the available tools:
 - create_employee: add a single new employee
 - update_employee: update an existing employee (partial updates OK)
 - bulk_upsert_employees: create/update multiple employees at once
-- import_employees_excel: import from an uploaded Excel/CSV file
+- import_employees_excel: import employee rows from an uploaded Excel/CSV file
 
 You can manage monthly attendance using:
 - search_attendance: list attendance for a month/year (filter by employee or department)
 - get_attendance: fetch one employee's attendance for a month/year
 - upsert_attendance: add or update attendance for one employee
 - bulk_upsert_attendance: add or update attendance for multiple employees
+- import_attendance_excel: import attendance rows from an uploaded Excel file
 
 Field mapping (Hindi ↔ English):
-- कर्मचारी कोड / employee code
+- कर्मचारी कोड / employee code / EMPNO (shown in the app as "EMPNO & Employee Name")
+- employee_id in Excel may mean EMPNO or internal numeric ID — the system preserves the exact value
 - नाम / name, employee_name
 - पिता का नाम / father_name
 - विभाग / department
@@ -211,11 +425,14 @@ Field mapping (Hindi ↔ English):
 
 Rules:
 1. Always use tools to read or modify employee and attendance data — never invent database records.
-2. Confirm with the user before bulk_upsert_employees or bulk_upsert_attendance with more than 3 records, or before import_employees_excel unless the user explicitly asked to import.
-3. If required fields are missing (e.g. month, year, employee), ask the user in their language.
-4. After successful mutations, summarize what changed clearly.
-5. Employee codes: use what the user provides; otherwise the system auto-generates EMP* codes.
-6. For attendance, month (1-12) and year are always required. Use search_employees first if you need to resolve an employee by name.
+2. When the user attaches an Excel file, read the provided file preview and follow the user's prompt. The file stays available for later messages in the same chat — do not ask the user to upload again.
+3. For attendance Excel imports, if the user gives month/year (e.g. 06/2026) call import_attendance_excel with file_path, month, and year. Apply month/year to rows that omit them. Use import_attendance_excel — do not manually re-type rows into bulk_upsert_attendance.
+4. Confirm with the user before bulk_upsert_employees or bulk_upsert_attendance with more than 3 records, or before import_employees_excel / import_attendance_excel unless the user explicitly asked to import or update from the file.
+5. If required fields are missing (e.g. month, year, employee), ask the user in their language.
+6. After successful mutations, summarize what changed clearly.
+7. Employee codes (EMPNO): always use the exact code from the user or uploaded file — never pad, reformat, rename, or auto-generate unless the user did not provide one for a new employee. Never change an existing employee's code unless the user explicitly asks.
+8. employee_id in tools means the internal numeric database ID only when the value is purely numeric. Values like EMP001 are employee_code (EMPNO), not database IDs.
+9. For attendance, month (1-12) and year are always required. Use search_employees first if you need to resolve an employee by name.
 PROMPT;
     }
 
@@ -277,4 +494,3 @@ PROMPT;
         }
     }
 }
-

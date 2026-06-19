@@ -11,7 +11,7 @@
         <!-- Collapse Button -->
         <button id="sidebarCollapseBtn" type="button" class="btn"
             style="font-size: 1.0rem; background: transparent; border: none; box-shadow: none; margin-left: 8px; padding: 4px;">
-            <i class="fa fa-times" style="color: #344767;"></i>
+            <i class="fa fa-times sidebar-collapse-icon"></i>
         </button>
     </div>
 
@@ -19,7 +19,7 @@
     <div class="collapse navbar-collapse w-auto h-100" id="sidenav-collapse-main">
         <ul class="navbar-nav">
             @can('dashboard.view')
-            <li class="nav-item pb-2">
+            <li class="nav-item">
                 <a class="nav-link {{ Route::currentRouteName() == 'dashboard' ? 'active' : '' }}"
                     href="{{ route('dashboard', ['company_id' => request()->session()->get('companyId')]) }}">
                     <div
@@ -337,61 +337,16 @@
         </ul>
     </div>
 </aside>
-<!-- Floating Sidebar Toggle Button -->
-<button id="showSidebarBtn" type="button"
-    style="
-        display: none;
-        position: fixed;
-        top: 20px;
-        left: 20px;
-        z-index: 1050;
-        font-size: 1.0rem;
-        background: #fff;
-        border: none;
-        border-radius: 50%;
-        box-shadow: 0 2px 6px rgba(52,71,103,0.15);
-        padding: 8px 12px;
-        color: #344767;
-        cursor: pointer;
-    ">
-    <i class="fa fa-bars"></i>
-</button>
+<!-- Floating sidebar toggle removed — use navbar #iconNavbarSidenav instead -->
 <script>
-    function updateSidebarToggleBtn() {
-        var showBtn = document.getElementById('showSidebarBtn');
-        if (!document.body.classList.contains('g-sidenav-pinned')) {
-            showBtn.style.display = 'block';
-        } else {
-            showBtn.style.display = 'none';
-        }
-    }
-
     document.addEventListener('DOMContentLoaded', function() {
-        // Close button
         var sidebarBtn = document.getElementById('sidebarCollapseBtn');
         if (sidebarBtn) {
             sidebarBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 document.body.classList.remove('g-sidenav-pinned');
-                if (typeof updateSidebarToggleBtn === 'function') {
-                    setTimeout(updateSidebarToggleBtn, 350);
-                }
             });
         }
-
-        // Floating open button
-        var showBtn = document.getElementById('showSidebarBtn');
-        if (showBtn) {
-            showBtn.addEventListener('click', function() {
-                document.body.classList.add('g-sidenav-pinned');
-                if (typeof updateSidebarToggleBtn === 'function') {
-                    updateSidebarToggleBtn();
-                }
-            });
-        }
-
-        // Initial state
-        updateSidebarToggleBtn();
     });
 </script>
 <style>
@@ -408,9 +363,16 @@
     body.g-sidenav-pinned .sidenav {
         width: 250px;
         min-width: 250px;
+        overflow-x: hidden;
+        overflow-y: auto;
         transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s, opacity 0.3s;
         opacity: 1;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
+    }
+
+    body.g-sidenav-pinned .sidenav .navbar-nav > .nav-item > .nav-link.active {
+        margin-top: 0.125rem;
+        margin-bottom: 0.125rem;
     }
 </style>

@@ -15,6 +15,7 @@
         </button>
         <div class="collapse navbar-collapse" id="navigation">
             <ul class="navbar-nav mx-auto">
+                <x-theme-toggle class="mx-2" />
                 @if (auth()->user())
                     <li class="nav-item">
                         <a class="nav-link text-dark d-flex align-items-center me-2 active" aria-current="page"

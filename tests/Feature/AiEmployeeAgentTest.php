@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\Location;
 use App\Models\User;
 use App\Services\Ai\AgentOrchestrator;
+use App\Services\Ai\ExcelPreviewService;
 use App\Services\Ai\OpenRouterClient;
 use App\Services\Ai\ToolRegistry;
 use App\Services\Ai\Tools\EmployeeToolProvider;
@@ -130,6 +131,56 @@ class AiEmployeeAgentTest extends TestCase
         $this->assertSame('Sales', $result['employee']['department']);
     }
 
+    public function test_update_employee_by_database_id_preserves_employee_code(): void
+    {
+        $employee = Employee::create([
+            'company_id' => $this->company->id,
+            'employee_code' => 'EMP002',
+            'employee_name' => 'Priya Singh',
+            'gender' => 'F',
+            'father_name' => 'Father Singh',
+            'department_id' => $this->department->id,
+            'designation_id' => $this->designation->id,
+            'location_id' => $this->location->id,
+        ]);
+
+        $updateTool = collect(EmployeeToolProvider::tools())->first(fn ($t) => $t->name() === 'update_employee');
+        $result = $updateTool->handle([
+            'employee_id' => $employee->id,
+            'department' => 'Sales',
+        ], $this->company->id, $this->user->id);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('EMP002', $result['employee']['employee_code']);
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'employee_code' => 'EMP002',
+        ]);
+    }
+
+    public function test_update_employee_accepts_empno_in_employee_id_field(): void
+    {
+        Employee::create([
+            'company_id' => $this->company->id,
+            'employee_code' => 'A-100',
+            'employee_name' => 'Custom Code Employee',
+            'gender' => 'M',
+            'father_name' => 'Father',
+            'department_id' => $this->department->id,
+            'designation_id' => $this->designation->id,
+            'location_id' => $this->location->id,
+        ]);
+
+        $updateTool = collect(EmployeeToolProvider::tools())->first(fn ($t) => $t->name() === 'update_employee');
+        $result = $updateTool->handle([
+            'employee_id' => 'A-100',
+            'department' => 'Sales',
+        ], $this->company->id, $this->user->id);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('A-100', $result['employee']['employee_code']);
+    }
+
     public function test_bulk_upsert_employees(): void
     {
         $bulkTool = collect(EmployeeToolProvider::tools())->first(fn ($t) => $t->name() === 'bulk_upsert_employees');
@@ -221,7 +272,7 @@ class AiEmployeeAgentTest extends TestCase
         $registry = new ToolRegistry();
         $registry->registerMany(EmployeeToolProvider::tools());
 
-        $orchestrator = new AgentOrchestrator($mockClient, $registry);
+        $orchestrator = new AgentOrchestrator($mockClient, $registry, app(ExcelPreviewService::class));
 
         $result = $orchestrator->sendMessage(
             $this->company->id,
@@ -265,7 +316,7 @@ class AiEmployeeAgentTest extends TestCase
 
         $registry = new ToolRegistry();
         $registry->registerMany(EmployeeToolProvider::tools());
-        $orchestrator = new AgentOrchestrator($mockClient, $registry);
+        $orchestrator = new AgentOrchestrator($mockClient, $registry, app(ExcelPreviewService::class));
 
         $result = $orchestrator->sendMessage(
             $this->company->id,

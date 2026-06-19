@@ -97,7 +97,9 @@ class EmployeeService
     {
         $employeeCode = trim((string) ($row['employee_code'] ?? ''));
         if ($employeeCode === '') {
-            $employeeCode = $this->generateEmployeeCode();
+            $employeeCode = $existingEmployee
+                ? $existingEmployee->employee_code
+                : $this->generateEmployeeCode();
         }
 
         if (!$existingEmployee) {
@@ -322,6 +324,36 @@ class EmployeeService
     }
 
     /**
+     * Resolve employee_id / employee_code from mixed tool or import input.
+     * Non-numeric employee_id values are treated as employee_code (EMPNO) and kept as-is.
+     *
+     * @param array<string, mixed> $data
+     * @return array{0: ?int, 1: ?string}
+     */
+    public function resolveEmployeeIdentifier(array $data): array
+    {
+        $employeeId = null;
+        $employeeCode = null;
+
+        if (isset($data['employee_code']) && trim((string) $data['employee_code']) !== '') {
+            $employeeCode = trim((string) $data['employee_code']);
+        }
+
+        if (isset($data['employee_id']) && $data['employee_id'] !== '' && $data['employee_id'] !== null) {
+            $raw = trim((string) $data['employee_id']);
+            if ($raw !== '') {
+                if (ctype_digit($raw)) {
+                    $employeeId = (int) $raw;
+                } else {
+                    $employeeCode = $employeeCode ?? $raw;
+                }
+            }
+        }
+
+        return [$employeeId, $employeeCode];
+    }
+
+    /**
      * Create an employee from AI agent data.
      *
      * @param int $companyId The ID of the company.
@@ -357,17 +389,14 @@ class EmployeeService
      */
     public function updateFromAgent(int $companyId, array $data): array
     {
-        $employee = $this->findForCompany(
-            $companyId,
-            isset($data['employee_id']) ? (int) $data['employee_id'] : null,
-            $data['employee_code'] ?? null
-        );
+        [$employeeId, $employeeCode] = $this->resolveEmployeeIdentifier($data);
+        $employee = $this->findForCompany($companyId, $employeeId, $employeeCode);
 
         if (!$employee) {
             throw ValidationException::withMessages(['employee' => 'Employee not found in this company.']);
         }
 
-        $normalized = $this->normalizeAgentRow($data);
+        $normalized = $this->normalizeAgentRow($data, generateCodeIfMissing: false);
         $result = $this->upsertFromImportRow($companyId, $normalized, $employee);
 
         if (!$result['success']) {
@@ -758,7 +787,7 @@ class EmployeeService
      * @param array<string,mixed> $row The raw row data.
      * @return array<string,mixed> Normalized row data.
      */
-    private function normalizeAgentRow(array $row): array
+    private function normalizeAgentRow(array $row, bool $generateCodeIfMissing = true): array
     {
         $normalized = $row;
 
@@ -775,7 +804,11 @@ class EmployeeService
         }
 
         if (empty($normalized['employee_code']) && !empty($row['employee_company_code'])) {
-            $normalized['employee_code'] = $row['employee_company_code'];
+            $normalized['employee_code'] = trim((string) $row['employee_company_code']);
+        }
+
+        if (!empty($normalized['employee_code'])) {
+            $normalized['employee_code'] = trim((string) $normalized['employee_code']);
         }
 
         foreach (['dob', 'doj', 'dol', 'joining_date', 'leaving_date'] as $dateField) {
@@ -785,7 +818,7 @@ class EmployeeService
             }
         }
 
-        if (empty($normalized['employee_code'])) {
+        if ($generateCodeIfMissing && empty($normalized['employee_code'])) {
             $normalized['employee_code'] = $this->generateEmployeeCode();
         }
 

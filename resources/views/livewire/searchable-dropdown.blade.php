@@ -9,11 +9,11 @@
             wire:keydown.enter="toggleOption($event.target.value)"
             class="w-full p-2 border radius-4 rounded"
         >
-        <div x-show="open"  class="position-absolute z-10 w-25 mt-1 bg-white border rounded shadow-lg max-h-60 overflow-y-auto">
+        <div x-show="open" class="position-absolute z-10 w-25 mt-1 bg-white border rounded shadow-lg max-h-60 overflow-y-auto searchable-dropdown-menu">
             
             @foreach ($filteredOptions as $option)
                 <div
-                    class="p-2 cursor-pointer hover:bg-gray-100"
+                    class="p-2 cursor-pointer searchable-dropdown-item"
                     wire:click="toggleOption('{{ $option }}')"
                 >
                    {{ $option }}

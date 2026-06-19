@@ -82,12 +82,12 @@ class GetEmployeeTool implements AiTool
     {
         return [
             'name' => $this->name(),
-            'description' => 'Get full details of one employee by employee_id or employee_code.',
+            'description' => 'Get full details of one employee by employee_code (EMPNO shown in the app) or numeric database employee_id.',
             'parameters' => [
                 'type' => 'object',
                 'properties' => [
-                    'employee_id' => ['type' => 'integer'],
-                    'employee_code' => ['type' => 'string'],
+                    'employee_id' => ['type' => 'integer', 'description' => 'Internal database ID only when numeric'],
+                    'employee_code' => ['type' => 'string', 'description' => 'EMPNO / company employee code — use exact value from file or user'],
                 ],
             ],
         ];
@@ -96,11 +96,8 @@ class GetEmployeeTool implements AiTool
     public function handle(array $args, int $companyId, int $userId): array
     {
         $service = app(EmployeeService::class);
-        $employee = $service->findForCompany(
-            $companyId,
-            isset($args['employee_id']) ? (int) $args['employee_id'] : null,
-            $args['employee_code'] ?? null
-        );
+        [$employeeId, $employeeCode] = $service->resolveEmployeeIdentifier($args);
+        $employee = $service->findForCompany($companyId, $employeeId, $employeeCode);
 
         if (!$employee) {
             return ['success' => false, 'error' => 'Employee not found.'];
@@ -181,7 +178,7 @@ class UpdateEmployeeTool implements AiTool
     {
         return [
             'name' => $this->name(),
-            'description' => 'Update an existing employee by employee_id or employee_code. Only provided fields are updated.',
+            'description' => 'Update an existing employee by employee_code (EMPNO) or numeric database employee_id. Only provided fields are updated. Never change employee_code unless the user explicitly asks.',
             'parameters' => [
                 'type' => 'object',
                 'properties' => [
@@ -211,7 +208,8 @@ class UpdateEmployeeTool implements AiTool
 
     public function handle(array $args, int $companyId, int $userId): array
     {
-        if (empty($args['employee_id']) && empty($args['employee_code'])) {
+        [$employeeId, $employeeCode] = app(EmployeeService::class)->resolveEmployeeIdentifier($args);
+        if ($employeeId === null && $employeeCode === null) {
             return ['success' => false, 'error' => 'employee_id or employee_code is required.'];
         }
 

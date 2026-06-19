@@ -57,6 +57,11 @@ class OpenRouterClient
                     continue;
                 }
 
+                if ($response->serverError() && $attempt < $attempts) {
+                    usleep($delayMs * 1000 * $attempt);
+                    continue;
+                }
+
                 if (!$response->successful()) {
                     $body = $response->json();
                     $message = $body['error']['message'] ?? $response->body();
