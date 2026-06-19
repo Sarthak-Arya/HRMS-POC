@@ -1,13 +1,13 @@
 <style>
     .ai-assistant-widget {
-        --gemini-bg: #131314;
-        --gemini-sidebar: #1e1f20;
-        --gemini-surface: #28292a;
-        --gemini-surface-hover: #37393b;
-        --gemini-border: #3c4043;
-        --gemini-text: #e3e3e3;
-        --gemini-text-muted: #9aa0a6;
-        --gemini-accent: #8ab4f8;
+        --gemini-bg: var(--hrms-page-bg, #131314);
+        --gemini-sidebar: var(--hrms-sidebar-bg, #1e1f20);
+        --gemini-surface: var(--hrms-surface-bg, #28292a);
+        --gemini-surface-hover: var(--hrms-hover-bg, #37393b);
+        --gemini-border: var(--hrms-border-color, #3c4043);
+        --gemini-text: var(--hrms-text-primary, #e3e3e3);
+        --gemini-text-muted: var(--hrms-text-muted, #9aa0a6);
+        --gemini-accent: var(--hrms-accent, #8ab4f8);
         --gemini-user-bg: #394457;
     }
 
