@@ -170,7 +170,11 @@ class AgentOrchestrator
         $messages = [
             [
                 'role' => 'system',
-                'content' => $this->systemPrompt($companyName, $companyId),
+                'content' => $this->systemPrompt(
+                    $companyName,
+                    $companyId,
+                    $this->resolveReplyLanguage($conversation),
+                ),
             ],
         ];
 
@@ -383,13 +387,20 @@ class AgentOrchestrator
      *
      * @param string $companyName The name of the company.
      * @param int $companyId The ID of the company.
+     * @param string $replyLanguage Either "english" or "hindi".
      * @return string The formatted system prompt.
      */
-    private function systemPrompt(string $companyName, int $companyId): string
+    private function systemPrompt(string $companyName, int $companyId, string $replyLanguage = 'english'): string
     {
+        $languageRule = $replyLanguage === 'hindi'
+            ? 'Reply in Hindi only. The user explicitly asked for Hindi responses.'
+            : 'Reply in English only. You may understand Hindi input (field names, instructions in Devanagari), but do not reply in Hindi unless the user explicitly asks (e.g. "reply in Hindi", "हिंदी में जवाब दें"). Do not mix Hindi and English in the same reply.';
+
         return <<<PROMPT
 You are a helpful payroll assistant for "{$companyName}" (company ID: {$companyId}).
-You understand and respond fluently in both Hindi and English — match the user's language.
+
+Language:
+{$languageRule}
 
 You can manage employees using the available tools:
 - search_employees: find employees by name, code, department, etc.
@@ -428,12 +439,85 @@ Rules:
 2. When the user attaches an Excel file, read the provided file preview and follow the user's prompt. The file stays available for later messages in the same chat — do not ask the user to upload again.
 3. For attendance Excel imports, if the user gives month/year (e.g. 06/2026) call import_attendance_excel with file_path, month, and year. Apply month/year to rows that omit them. Use import_attendance_excel — do not manually re-type rows into bulk_upsert_attendance.
 4. Confirm with the user before bulk_upsert_employees or bulk_upsert_attendance with more than 3 records, or before import_employees_excel / import_attendance_excel unless the user explicitly asked to import or update from the file.
-5. If required fields are missing (e.g. month, year, employee), ask the user in their language.
+5. If required fields are missing (e.g. month, year, employee), ask the user clearly in {$replyLanguage}.
 6. After successful mutations, summarize what changed clearly.
 7. Employee codes (EMPNO): always use the exact code from the user or uploaded file — never pad, reformat, rename, or auto-generate unless the user did not provide one for a new employee. Never change an existing employee's code unless the user explicitly asks.
 8. employee_id in tools means the internal numeric database ID only when the value is purely numeric. Values like EMP001 are employee_code (EMPNO), not database IDs.
 9. For attendance, month (1-12) and year are always required. Use search_employees first if you need to resolve an employee by name.
 PROMPT;
+    }
+
+    /**
+     * Determine reply language from explicit user requests in the conversation.
+     */
+    private function resolveReplyLanguage(AiConversation $conversation): string
+    {
+        $language = 'english';
+
+        $userMessages = $conversation->messages()
+            ->where('role', 'user')
+            ->orderBy('id')
+            ->pluck('content');
+
+        foreach ($userMessages as $content) {
+            $text = trim((string) $content);
+            if ($text === '') {
+                continue;
+            }
+
+            if ($this->userExplicitlyRequestsHindiReplies($text)) {
+                $language = 'hindi';
+            } elseif ($this->userExplicitlyRequestsEnglishReplies($text)) {
+                $language = 'english';
+            }
+        }
+
+        return $language;
+    }
+
+    private function userExplicitlyRequestsHindiReplies(string $text): bool
+    {
+        $normalized = mb_strtolower($text);
+
+        $patterns = [
+            '/\b(reply|respond|answer|speak|write|use)\s+(in\s+)?hindi\b/u',
+            '/\bhindi\s+(reply|response|mein|me)\b/u',
+            '/\bin\s+hindi\b/u',
+            '/\bhindi\s+mein\b/u',
+            '/\bhindi\s+me\b/u',
+            '/हिंदी\s*में\s*(जवाब|बताए|बताओ|लिख|बोल)/u',
+            '/\b(जवाब|बताए|बताओ)\s*.*\s*हिंदी\s*में/u',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $normalized) || preg_match($pattern, $text)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function userExplicitlyRequestsEnglishReplies(string $text): bool
+    {
+        $normalized = mb_strtolower($text);
+
+        $patterns = [
+            '/\b(reply|respond|answer|speak|write|use)\s+(in\s+)?english\b/u',
+            '/\benglish\s+(reply|response|mein|me)\b/u',
+            '/\bin\s+english\b/u',
+            '/\benglish\s+mein\b/u',
+            '/\benglish\s+me\b/u',
+            '/अंग्रेजी\s*में\s*(जवाब|बताए|बताओ|लिख|बोल)/u',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $normalized) || preg_match($pattern, $text)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

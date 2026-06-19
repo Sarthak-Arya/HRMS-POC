@@ -154,6 +154,18 @@
                 </a>
             </li>
             @endcanany
+            @can('ai.assistant.use')
+            <li class="nav-item">
+                <a class="nav-link {{ Route::currentRouteName() == 'ai-assistant' ? 'active' : '' }}"
+                    href="{{ route('ai-assistant', ['company_id' => request()->session()->get('companyId')]) }}">
+                    <div
+                        class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
+                        <i class="fas fa-robot text-dark text-sm"></i>
+                    </div>
+                    <span class="nav-link-text ms-1">AI Assistant</span>
+                </a>
+            </li>
+            @endcan
             @canany(['compensation.view', 'salary.generate'])
             <li class="nav-item mt-2">
                 <h6 class="ps-4 ms-2 text-uppercase text-xs font-weight-bolder opacity-6">Salary Operations</h6>

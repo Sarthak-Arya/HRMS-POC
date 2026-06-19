@@ -44,7 +44,7 @@
             @php
                 $widgetCompanyId = request()->route('company_id') ?? session('companyId');
             @endphp
-            @if($widgetCompanyId)
+            @if($widgetCompanyId && request()->route()->getName() !== 'ai-assistant')
                 @can('ai.assistant.use')
                     @livewire('ai-assistant-widget', ['company_id' => $widgetCompanyId], key('ai-widget-' . $widgetCompanyId))
                 @endcan

@@ -25,6 +25,7 @@ use App\Http\Livewire\PayrollRunList;
 use App\Http\Livewire\PayrollRunDetail;
 use App\Http\Livewire\EmployeePayrollDetail;
 use App\Http\Livewire\PayrollHistory;
+use App\Http\Livewire\AiAssistantPage;
 use App\Http\Controllers\PayslipController;
 
 use App\Http\Middleware\CompanyAccessMiddleware;
@@ -114,6 +115,10 @@ Route::middleware('auth')->group(function () {
 
             Route::middleware('permission:attendance.view,attendance.manage')->group(function () {
                 Route::get('/attendance-entry', AttendanceEntry::class)->name('attendance-entry');
+            });
+
+            Route::middleware('permission:ai.assistant.use')->group(function () {
+                Route::get('/ai-assistant', AiAssistantPage::class)->name('ai-assistant');
             });
         });
     });
