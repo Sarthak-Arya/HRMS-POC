@@ -25,17 +25,7 @@
                                 @endforeach
                             </select>
                             @error('structure_id') <span class="text-danger text-sm">{{ $message }}</span> @enderror
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Annual CTC</label>
-                                <input type="number" step="0.01" wire:model="annualCtc" class="form-control">
-                                @error('annual_ctc') <span class="text-danger text-sm">{{ $message }}</span> @enderror
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Monthly Gross</label>
-                                <input type="number" step="0.01" wire:model="monthlyGross" class="form-control">
-                            </div>
+                            <p class="text-xs text-muted mt-2 mb-0">Monthly gross and annual CTC are calculated automatically from the selected structure.</p>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Effective From</label>
@@ -59,7 +49,8 @@
                             <thead>
                                 <tr>
                                     <th>Structure</th>
-                                    <th>CTC</th>
+                                    <th>Monthly Gross</th>
+                                    <th>Annual CTC</th>
                                     <th>From</th>
                                     <th>To</th>
                                 </tr>
@@ -68,12 +59,13 @@
                                 @forelse($history as $revision)
                                     <tr>
                                         <td>{{ $revision->structure->structure_name ?? '—' }}</td>
+                                        <td>{{ number_format($revision->monthly_gross, 0) }}</td>
                                         <td>{{ number_format($revision->annual_ctc, 0) }}</td>
                                         <td>{{ $revision->effective_from->format('d M Y') }}</td>
                                         <td>{{ $revision->effective_to?->format('d M Y') ?? 'Current' }}</td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="4" class="text-muted text-sm p-3">No compensation history yet.</td></tr>
+                                    <tr><td colspan="5" class="text-muted text-sm p-3">No compensation history yet.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -93,7 +85,10 @@
                         @if($resolved && $resolved->lines->isNotEmpty())
                             <p class="text-sm text-muted">
                                 Source: {{ str_replace('_', ' ', $resolved->structureSource) }}
-                                @if($resolved->annualCtc)
+                                @if($resolved->monthlyGross !== null)
+                                    · Monthly Gross: {{ number_format($resolved->monthlyGross, 2) }}
+                                @endif
+                                @if($resolved->annualCtc !== null)
                                     · Annual CTC: {{ number_format($resolved->annualCtc, 2) }}
                                 @endif
                             </p>
@@ -128,7 +123,7 @@
                                 </tfoot>
                             </table>
                         @else
-                            <p class="text-muted mb-0">Assign a structure and CTC to see the resolved payslip breakdown.</p>
+                            <p class="text-muted mb-0">Select a structure to see the calculated monthly gross, annual CTC, and payslip breakdown.</p>
                         @endif
                     </div>
                 </div>

@@ -323,6 +323,7 @@ class AddEmployeeDetails extends Component
             "locationOptions" => $locations->pluck('location_name')->filter()->values()->all(),
             "companyId" => $this->companyId,
             "employeeId" => $this->employeeId,
+            "pageCompanyName" => $company?->company_name ?? 'Company',
         ]);
     }
 

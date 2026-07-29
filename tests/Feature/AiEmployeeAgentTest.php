@@ -35,12 +35,11 @@ class AiEmployeeAgentTest extends TestCase
         $this->user = User::factory()->create();
         $this->actingAs($this->user);
 
-        $this->company = Company::create([
+        $this->company = Company::factory()->ownedBy($this->user)->create([
             'company_name' => 'Test Co',
             'company_address' => '123 Test St',
             'is_esi' => false,
             'is_pf' => false,
-            'company_handled_by' => $this->user->id,
         ]);
 
         $this->department = Department::create([
@@ -212,12 +211,11 @@ class AiEmployeeAgentTest extends TestCase
     public function test_cannot_update_employee_from_other_company(): void
     {
         $otherUser = User::factory()->create();
-        $otherCompany = Company::create([
+        $otherCompany = Company::factory()->ownedBy($otherUser)->create([
             'company_name' => 'Other Co',
             'company_address' => '456 Other St',
             'is_esi' => false,
             'is_pf' => false,
-            'company_handled_by' => $otherUser->id,
         ]);
 
         $otherDept = Department::create([

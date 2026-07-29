@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\Permission as PermissionEnum;
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -28,9 +29,32 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
     ];
 
-    public function companiesHandled(): HasMany
+    public function b2bFirm(): BelongsTo
     {
-        return $this->hasMany(Company::class, 'company_handled_by');
+        return $this->belongsTo(B2bFirm::class, 'b2b_firm_id');
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'company_id');
+    }
+
+    /**
+     * Companies this B2B user can manage through their firm.
+     */
+    public function firmCompanies(): HasMany
+    {
+        return $this->hasMany(Company::class, 'b2b_firm_id', 'b2b_firm_id');
+    }
+
+    public function isB2bUser(): bool
+    {
+        return $this->b2b_firm_id !== null;
+    }
+
+    public function isB2cUser(): bool
+    {
+        return $this->company_id !== null && $this->b2b_firm_id === null;
     }
 
     public function hasRole($roles, ?string $guard = null): bool
@@ -75,13 +99,22 @@ class User extends Authenticatable
             return true;
         }
 
-        if ($company instanceof Company) {
-            return (int) $company->company_handled_by === $this->id;
+        $companyModel = $company instanceof Company
+            ? $company
+            : Company::query()->find($company);
+
+        if (! $companyModel) {
+            return false;
         }
 
-        return Company::query()
-            ->whereKey($company)
-            ->where('company_handled_by', $this->id)
-            ->exists();
+        if ($this->b2b_firm_id !== null) {
+            return (int) $companyModel->b2b_firm_id === (int) $this->b2b_firm_id;
+        }
+
+        if ($this->company_id !== null) {
+            return (int) $companyModel->id === (int) $this->company_id;
+        }
+
+        return false;
     }
 }

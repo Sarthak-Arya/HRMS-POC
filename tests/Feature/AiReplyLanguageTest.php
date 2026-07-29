@@ -27,12 +27,11 @@ class AiReplyLanguageTest extends TestCase
         $this->user = User::factory()->create();
         $this->actingAs($this->user);
 
-        $this->company = Company::create([
+        $this->company = Company::factory()->ownedBy($this->user)->create([
             'company_name' => 'Test Co',
             'company_address' => '123 Test St',
             'is_esi' => false,
             'is_pf' => false,
-            'company_handled_by' => $this->user->id,
         ]);
     }
 

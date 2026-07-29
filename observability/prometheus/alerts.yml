@@ -1,0 +1,83 @@
+groups:
+  - name: payroll-app
+    rules:
+      - alert: PayrollAppHigh5xxRate
+        expr: |
+          (
+            sum(rate(payroll_http_requests_total{status_class="5xx"}[5m]))
+            /
+            clamp_min(sum(rate(payroll_http_requests_total[5m])), 0.001)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: sev1
+          owner: platform
+        annotations:
+          summary: High 5xx rate on payroll-app
+          runbook_url: /docs/runbooks/high-5xx-rate.md
+
+      - alert: PayrollAppHighLatencyP95
+        expr: |
+          histogram_quantile(0.95, sum(rate(payroll_http_request_duration_seconds_bucket[10m])) by (le)) > 2
+        for: 10m
+        labels:
+          severity: sev2
+          owner: platform
+        annotations:
+          summary: HTTP p95 latency above 2s
+          runbook_url: /docs/runbooks/high-latency.md
+
+      - alert: ObservabilityCollectorDown
+        expr: up{job="otel-collector"} == 0
+        for: 5m
+        labels:
+          severity: sev2
+          owner: platform
+        annotations:
+          summary: OpenTelemetry collector scrape is down
+          runbook_url: /docs/runbooks/collector-down.md
+
+      - alert: QueueDepthHigh
+        expr: payroll_queue_depth > 100
+        for: 10m
+        labels:
+          severity: sev2
+          owner: payroll-eng
+        annotations:
+          summary: Queue depth is elevated
+          runbook_url: /docs/runbooks/queue-backlog.md
+
+      - alert: PayrollBatchFailed
+        expr: increase(payroll_batch_failed_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: sev1
+          owner: payroll-eng
+        annotations:
+          summary: Payroll batch reported failures
+          runbook_url: /docs/runbooks/payroll-batch-failed.md
+
+      - alert: OpenRouterErrorSpike
+        expr: |
+          (
+            sum(rate(payroll_http_client_requests_total{provider="openrouter",status_class=~"4xx|5xx"}[10m]))
+            /
+            clamp_min(sum(rate(payroll_http_client_requests_total{provider="openrouter"}[10m])), 0.001)
+          ) > 0.2
+        for: 10m
+        labels:
+          severity: sev3
+          owner: payroll-eng
+        annotations:
+          summary: OpenRouter error rate elevated
+          runbook_url: /docs/runbooks/ai-provider-errors.md
+
+      - alert: AuthDenialSpike
+        expr: sum(rate(payroll_security_events_total{outcome="denied"}[10m])) > 1
+        for: 10m
+        labels:
+          severity: sev2
+          owner: security
+        annotations:
+          summary: Elevated authz denial rate
+          runbook_url: /docs/runbooks/auth-denial-spike.md

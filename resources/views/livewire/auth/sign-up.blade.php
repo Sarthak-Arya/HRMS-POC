@@ -114,11 +114,13 @@
                                   <label class="form-label text-sm text-secondary mb-1">{{ __('Your role') }}</label>
                                   <div class="@error('role') border border-danger rounded-3 @enderror">
                                       <select wire:model.live="role" class="form-control" aria-label="Role">
-                                          @foreach ($registerableRoles as $registerableRole)
-                                              <option value="{{ $registerableRole->name }}">
-                                                  {{ \App\Enums\UserRole::from($registerableRole->name)->label() }}
+                                          @forelse ($registerableRoles as $registerableRole)
+                                              <option value="{{ $registerableRole->name }}" @selected($role === $registerableRole->name)>
+                                                  {{ \App\Enums\UserRole::tryFrom($registerableRole->name)?->label() ?? $registerableRole->name }}
                                               </option>
-                                          @endforeach
+                                          @empty
+                                              <option value="" disabled selected>{{ __('No roles available') }}</option>
+                                          @endforelse
                                       </select>
                                   </div>
                                   @if (!empty($roleDescriptions[$role] ?? null))

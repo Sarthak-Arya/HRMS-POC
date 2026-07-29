@@ -1,0 +1,84 @@
+{
+  "index_templates": [
+    {
+      "name": "payroll-logs",
+      "index_patterns": ["payroll-logs-*"],
+      "template": {
+        "settings": {
+          "number_of_shards": 1,
+          "number_of_replicas": 0,
+          "index.lifecycle.name": "payroll-logs-policy",
+          "index.lifecycle.rollover_alias": "payroll-logs"
+        },
+        "mappings": {
+          "properties": {
+            "@timestamp": { "type": "date" },
+            "severity": { "type": "keyword" },
+            "service.name": { "type": "keyword" },
+            "event.name": { "type": "keyword" },
+            "event.category": { "type": "keyword" },
+            "event.outcome": { "type": "keyword" },
+            "request.id": { "type": "keyword" },
+            "trace.id": { "type": "keyword" },
+            "company.id": { "type": "keyword" },
+            "actor.user_id": { "type": "keyword" },
+            "message": { "type": "text" }
+          }
+        }
+      }
+    },
+    {
+      "name": "payroll-security",
+      "index_patterns": ["payroll-security-*"],
+      "template": {
+        "settings": {
+          "number_of_shards": 1,
+          "number_of_replicas": 0,
+          "index.lifecycle.name": "payroll-security-policy"
+        },
+        "mappings": {
+          "properties": {
+            "@timestamp": { "type": "date" },
+            "event.name": { "type": "keyword" },
+            "event.outcome": { "type": "keyword" },
+            "actor.user_id": { "type": "keyword" },
+            "company.id": { "type": "keyword" },
+            "request.id": { "type": "keyword" }
+          }
+        }
+      }
+    }
+  ],
+  "ilm_policies": {
+    "payroll-logs-policy": {
+      "policy": {
+        "phases": {
+          "hot": {
+            "actions": {
+              "rollover": { "max_age": "1d", "max_size": "10gb" }
+            }
+          },
+          "delete": {
+            "min_age": "90d",
+            "actions": { "delete": {} }
+          }
+        }
+      }
+    },
+    "payroll-security-policy": {
+      "policy": {
+        "phases": {
+          "hot": {
+            "actions": {
+              "rollover": { "max_age": "1d", "max_size": "5gb" }
+            }
+          },
+          "delete": {
+            "min_age": "180d",
+            "actions": { "delete": {} }
+          }
+        }
+      }
+    }
+  }
+}

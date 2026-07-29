@@ -5,13 +5,16 @@ namespace App\Support;
 class AiMessageFormatter
 {
     /**
-     * Escape HTML, convert **bold** markers, and preserve line breaks.
+     * Render assistant markdown (tables, lists, emphasis) into styled HTML.
      */
     public static function format(string $content): string
     {
-        $escaped = e($content);
-        $withBold = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $escaped) ?? $escaped;
+        $html = AiMarkdownRenderer::toHtml($content);
 
-        return nl2br($withBold, false);
+        if ($html === '') {
+            return '';
+        }
+
+        return '<div class="ai-markdown">' . $html . '</div>';
     }
 }

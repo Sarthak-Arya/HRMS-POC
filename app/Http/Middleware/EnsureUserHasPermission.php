@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Services\Auth\RolePermissionSync;
 use App\Services\Auth\UserRoleService;
+use App\Services\Observability\DomainTelemetry;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -44,6 +45,12 @@ class EnsureUserHasPermission
                 }
             }
         }
+
+        app(DomainTelemetry::class)->securityDenied('access.permission.denied', [
+            'permission' => implode('|', $permissions),
+            'route.template' => '/'.ltrim((string) optional($request->route())->uri(), '/'),
+            'policy' => 'permission',
+        ]);
 
         abort(403, 'You do not have permission to access this feature.');
     }

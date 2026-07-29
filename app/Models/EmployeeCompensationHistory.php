@@ -12,8 +12,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $company_id
  * @property int $employee_id
  * @property int $structure_id
- * @property float $annual_ctc
- * @property float $monthly_gross
+ * @property float $annual_ctc Snapshot of structure-derived annual CTC at revision time
+ * @property float $monthly_gross Snapshot of structure-derived monthly gross at revision time
  * @property \Illuminate\Support\Carbon $effective_from
  * @property \Illuminate\Support\Carbon|null $effective_to
  * @property string|null $revision_reason

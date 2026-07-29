@@ -35,7 +35,6 @@ class AttendanceEntry extends Component
     public $excel_file;
     public $selectedLocation = '';
     public $locations = [];
-    public int $deductionCount = 1;
 
     protected $rules = [
         'month' => 'required|integer|min:1|max:12',
@@ -69,9 +68,7 @@ class AttendanceEntry extends Component
 
         $companyId = session()->get('companyId');
         $locationId = $this->selectedLocation ?: null;
-        $this->leaveTypes = LeaveType::where('company_id', $companyId)
-            ->when($locationId, function($q) use ($locationId) { return $q->where('location_id', $locationId); })
-            ->get();
+        $this->leaveTypes = LeaveType::where('company_id', $companyId)->get();
     }
 
     public function updatedMonth()
@@ -115,23 +112,13 @@ class AttendanceEntry extends Component
         $this->isEditMode = !$this->isEditMode;
     }
 
-    public function addDeductionColumn(): void
-    {
-        $this->deductionCount = min($this->deductionCount + 1, 20);
-    }
-
-    public function removeDeductionColumn(): void
-    {
-        $this->deductionCount = max($this->deductionCount - 1, 1);
-    }
-
     public function save()
     {
         $this->validateOnly('month');
         $this->validateOnly('year');
 
         $companyId = session()->get('companyId');
-        if (!$companyId || !Schema::hasTable('attendance')) {
+        if (!$companyId || !Schema::hasTable('employee_attendance_summaries')) {
             session()->flash('message', 'Attendance table is not configured.');
             $this->isEditMode = false;
             return;
@@ -146,12 +133,7 @@ class AttendanceEntry extends Component
             $totalDays = (float) ($data['tot_dys'] ?? 0);
             $workedDays = max(0, $totalDays - ($cl + $el + $sl + $esiLeave + $holiday));
 
-            $deductions = array_values(array_map(
-                fn ($v) => (float) $v,
-                array_slice(($data['deductions'] ?? []), 0, $this->deductionCount)
-            ));
-
-            MonthlyAttendance::updateOrCreate(
+            $record = MonthlyAttendance::updateOrCreate(
                 [
                     'employee_id' => $employeeId,
                     'company_id' => $companyId,
@@ -159,20 +141,22 @@ class AttendanceEntry extends Component
                     'year' => $this->year,
                 ],
                 [
-                    'casual_leave' => $cl,
-                    'earned_leave' => $el,
-                    'sick_leave' => $sl,
-                    'esi_la' => $esiLeave,
-                    'holiday' => $holiday,
+                    'entry_source' => 'manual',
+                    'holiday_days' => $holiday,
                     'total_days' => $totalDays,
+                    'working_days' => $totalDays > 0 ? $totalDays : 26,
+                    'present_days' => $workedDays,
+                    'paid_leave_days' => $cl + $el + $sl,
+                    'esi_la' => $esiLeave,
                     'worked_days' => $workedDays,
-                    'deductions' => $deductions,
-                    // Keep legacy columns populated for backward compatibility.
-                    'ded_1' => $deductions[0] ?? 0,
-                    'ded_2' => $deductions[1] ?? 0,
-                    'ded_3' => $deductions[2] ?? 0,
                 ]
             );
+
+            $record->syncLeaveBreakdown([
+                'CL' => $cl,
+                'EL' => $el,
+                'SL' => $sl,
+            ]);
         }
         session()->flash('message', 'Monthly attendance saved successfully.');
         $this->isEditMode = false;
@@ -187,7 +171,7 @@ class AttendanceEntry extends Component
         }
         try {
             $companyId = session()->get('companyId');
-            if (!$companyId || !Schema::hasTable('attendance')) {
+            if (!$companyId || !Schema::hasTable('employee_attendance_summaries')) {
                 session()->flash('import_message', 'Attendance table is not configured.');
                 return;
             }
@@ -210,16 +194,7 @@ class AttendanceEntry extends Component
                 $totalDays = (float) ($data['tot_dys'] ?? 0);
                 $workedDays = max(0, $totalDays - ($cl + $el + $sl + $esiLeave + $holiday));
 
-                $deductions = [];
-                for ($i = 1; $i <= 50; $i++) {
-                    $key = 'ded_' . $i;
-                    if (!array_key_exists($key, $data)) {
-                        break;
-                    }
-                    $deductions[] = (float) ($data[$key] ?? 0);
-                }
-
-                MonthlyAttendance::updateOrCreate(
+                $record = MonthlyAttendance::updateOrCreate(
                     [
                         'employee_id' => $data['employee_id'],
                         'company_id' => $companyId,
@@ -227,19 +202,22 @@ class AttendanceEntry extends Component
                         'year' => $data['year'],
                     ],
                     [
-                        'casual_leave' => $cl,
-                        'earned_leave' => $el,
-                        'sick_leave' => $sl,
-                        'esi_la' => $esiLeave,
-                        'holiday' => $holiday,
+                        'entry_source' => 'manual',
+                        'holiday_days' => $holiday,
                         'total_days' => $totalDays,
+                        'working_days' => $totalDays > 0 ? $totalDays : 26,
+                        'present_days' => $workedDays,
+                        'paid_leave_days' => $cl + $el + $sl,
+                        'esi_la' => $esiLeave,
                         'worked_days' => $workedDays,
-                        'deductions' => $deductions,
-                        'ded_1' => $deductions[0] ?? 0,
-                        'ded_2' => $deductions[1] ?? 0,
-                        'ded_3' => $deductions[2] ?? 0,
                     ]
                 );
+
+                $record->syncLeaveBreakdown([
+                    'CL' => $cl,
+                    'EL' => $el,
+                    'SL' => $sl,
+                ]);
             }
             session()->flash('import_message', 'Monthly attendance imported successfully.');
         } catch (\Exception $e) {
@@ -261,9 +239,6 @@ class AttendanceEntry extends Component
             'holiday',
             'tot_dys',
         ];
-        for ($i = 1; $i <= $this->deductionCount; $i++) {
-            $columns[] = 'ded_' . $i;
-        }
         $sampleRow = array_fill(0, count($columns), '');
         return \Maatwebsite\Excel\Facades\Excel::download(new AttendanceTemplateExport($columns, [$sampleRow]), 'monthly_attendance_template.xlsx');
     }
@@ -273,29 +248,16 @@ class AttendanceEntry extends Component
         $employees = $this->getEmployeesQuery()->paginate(10);
         $companyId = session()->get('companyId');
         foreach ($employees as $employee) {
-            $attendance = Schema::hasTable('attendance')
+            $attendance = Schema::hasTable('employee_attendance_summaries')
                 ? MonthlyAttendance::where('employee_id', $employee->id)
                     ->where('company_id', $companyId)
                     ->where('month', $this->month)
                     ->where('year', $this->year)
+                    ->with('leaveBreakdown.leaveType')
                     ->first()
                 : null;
 
             if (!$this->isEditMode || !isset($this->attendanceData[$employee->id])) {
-                $existingDeductions = [];
-                if ($attendance) {
-                    $existingDeductions = is_array($attendance->deductions ?? null) ? $attendance->deductions : [];
-                    if (empty($existingDeductions)) {
-                        // Backwards-compat: if legacy columns exist, use them as seed values.
-                        $existingDeductions = array_values(array_filter([
-                            $attendance->ded_1 ?? null,
-                            $attendance->ded_2 ?? null,
-                            $attendance->ded_3 ?? null,
-                        ], fn ($v) => $v !== null));
-                    }
-                }
-                $this->deductionCount = max($this->deductionCount, max(1, count($existingDeductions)));
-
                 $this->attendanceData[$employee->id] = [
                     'cl' => $attendance->casual_leave ?? 0,
                     'el' => $attendance->earned_leave ?? 0,
@@ -303,7 +265,6 @@ class AttendanceEntry extends Component
                     'esi_leave' => $attendance->esi_la ?? 0,
                     'holiday' => $attendance->holiday ?? 0,
                     'tot_dys' => $attendance->total_days ?? 0,
-                    'deductions' => $existingDeductions,
                 ];
             }
 

@@ -6,17 +6,29 @@ use App\Models\Employee;
 use App\Models\EmployeeCompensationHistory;
 use App\Models\MonthlyAttendance;
 use App\Models\PayrollRun;
+use App\Services\Attendance\AttendanceService;
+use App\Services\Attendance\MonthLockAndReconciliationService;
+use App\Services\Compensation\CompensationResolver;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 class PayrollReadinessService
 {
+    public function __construct(
+        private readonly AttendanceService $attendanceService,
+        private readonly MonthLockAndReconciliationService $lockService,
+        private readonly CompensationResolver $compensationResolver,
+    ) {}
+
     /**
      * @return array{
      *     total_employees: int,
      *     ready_count: int,
      *     missing_attendance: Collection,
      *     missing_compensation: Collection,
+     *     unlocked_summaries: Collection,
+     *     reconciliation_conflicts: list<array{employee_id: int, employee_code: string|null, message: string}>,
+     *     governance_messages: list<string>,
      *     is_ready: bool
      * }
      */
@@ -27,17 +39,20 @@ class PayrollReadinessService
 
         $missingAttendance = collect();
         $missingCompensation = collect();
+        $unlockedSummaries = collect();
 
         foreach ($employees as $employee) {
-            $hasAttendance = MonthlyAttendance::query()
+            $summary = MonthlyAttendance::query()
                 ->where('employee_id', $employee->id)
                 ->where('company_id', $run->company_id)
                 ->where('month', $run->month)
                 ->where('year', $run->year)
-                ->exists();
+                ->first();
 
-            if (! $hasAttendance) {
+            if (! $summary) {
                 $missingAttendance->push($employee);
+            } elseif (! $this->attendanceService->isSummaryLocked($summary)) {
+                $unlockedSummaries->push($employee);
             }
 
             $hasCompensation = EmployeeCompensationHistory::query()
@@ -49,11 +64,21 @@ class PayrollReadinessService
                 ->exists();
 
             if (! $hasCompensation) {
+                $resolved = $this->compensationResolver->resolveForEmployee($employee, $asOf);
+                $hasCompensation = $resolved->structureId !== null && $resolved->lines->isNotEmpty();
+            }
+
+            if (! $hasCompensation) {
                 $missingCompensation->push($employee);
             }
         }
 
-        $blockedIds = $missingAttendance->pluck('id')->merge($missingCompensation->pluck('id'))->unique();
+        $governance = $this->lockService->assertReadyForPayroll($run);
+        $blockedIds = $missingAttendance->pluck('id')
+            ->merge($missingCompensation->pluck('id'))
+            ->merge($unlockedSummaries->pluck('id'))
+            ->merge(collect($governance['reconciliation_conflicts'])->pluck('employee_id'))
+            ->unique();
         $readyCount = $employees->count() - $blockedIds->count();
 
         return [
@@ -61,7 +86,13 @@ class PayrollReadinessService
             'ready_count' => max(0, $readyCount),
             'missing_attendance' => $missingAttendance,
             'missing_compensation' => $missingCompensation,
-            'is_ready' => $missingAttendance->isEmpty() && $missingCompensation->isEmpty(),
+            'unlocked_summaries' => $unlockedSummaries,
+            'reconciliation_conflicts' => $governance['reconciliation_conflicts'],
+            'governance_messages' => $governance['messages'],
+            'is_ready' => $missingAttendance->isEmpty()
+                && $missingCompensation->isEmpty()
+                && $unlockedSummaries->isEmpty()
+                && $governance['reconciliation_conflicts'] === [],
         ];
     }
 

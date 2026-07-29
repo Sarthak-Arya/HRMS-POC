@@ -1,0 +1,5 @@
+{
+    "php.debug.port": 9003,
+    "php.validate.executablePath": "C:\\php-8.4.11\\php.exe",
+    "php.executablePath": "C:\\php-8.4.11\\php.exe"
+}

@@ -25,7 +25,7 @@ class EmployeeFormTest extends TestCase
         parent::setUp();
 
         $this->user = User::factory()->hrManager()->create();
-        $this->company = Company::factory()->create(['company_handled_by' => $this->user->id]);
+        $this->company = Company::factory()->ownedBy($this->user)->create();
         $this->actingAs($this->user);
     }
 

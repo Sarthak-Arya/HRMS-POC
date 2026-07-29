@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Observability\JsonLogFormatter;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -10,41 +11,38 @@ return [
     |--------------------------------------------------------------------------
     | Default Log Channel
     |--------------------------------------------------------------------------
-    |
-    | This option defines the default log channel that gets used when writing
-    | messages to the logs. The name specified in this option should match
-    | one of the channels defined in the "channels" configuration array.
-    |
     */
 
     'default' => env('LOG_CHANNEL', 'stack'),
 
     /*
     |--------------------------------------------------------------------------
+    | Deprecations Log Channel
+    |--------------------------------------------------------------------------
+    */
+
+    'deprecations' => [
+        'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'null'),
+        'trace' => false,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Log Channels
     |--------------------------------------------------------------------------
-    |
-    | Here you may configure the log channels for your application. Out of
-    | the box, Laravel uses the Monolog PHP logging library. This gives
-    | you a variety of powerful log handlers / formatters to utilize.
-    |
-    | Available Drivers: "single", "daily", "slack", "syslog",
-    |                    "errorlog", "monolog",
-    |                    "custom", "stack"
-    |
     */
 
     'channels' => [
         'stack' => [
             'driver' => 'stack',
-            'channels' => ['errorlog', 'syslog'],
+            'channels' => explode(',', env('LOG_STACK', 'stderr_json,daily')),
             'ignore_exceptions' => false,
         ],
 
         'single' => [
             'driver' => 'single',
-            'path' => storage_path(path: 'logs/laravel.log'),
-            'level' => env('LOG_LEVEL', default: 'debug'),
+            'path' => storage_path('logs/laravel.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
         ],
 
         'daily' => [
@@ -52,6 +50,57 @@ return [
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
             'days' => 14,
+            'formatter' => JsonLogFormatter::class,
+        ],
+
+        'stderr_json' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'handler' => StreamHandler::class,
+            'formatter' => JsonLogFormatter::class,
+            'with' => [
+                'stream' => 'php://stderr',
+            ],
+        ],
+
+        'application' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/application.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => 14,
+            'formatter' => JsonLogFormatter::class,
+        ],
+
+        'security' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/security.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => 30,
+            'formatter' => JsonLogFormatter::class,
+        ],
+
+        'payroll' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/payroll.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => 14,
+            'formatter' => JsonLogFormatter::class,
+        ],
+
+        'attendance' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/attendance.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => 14,
+            'formatter' => JsonLogFormatter::class,
+        ],
+
+        'integration' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/integration.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => 14,
+            'formatter' => JsonLogFormatter::class,
         ],
 
         'slack' => [
@@ -59,7 +108,7 @@ return [
             'url' => env('LOG_SLACK_WEBHOOK_URL'),
             'username' => 'Laravel Log',
             'emoji' => ':boom:',
-            'level' => env('LOG_LEVEL', default: 'critical'),
+            'level' => env('LOG_LEVEL', 'critical'),
         ],
 
         'papertrail' => [
@@ -84,14 +133,12 @@ return [
 
         'syslog' => [
             'driver' => 'syslog',
-            'path' => storage_path('logs/sys.log'),
             'level' => env('LOG_LEVEL', 'debug'),
         ],
 
         'errorlog' => [
             'driver' => 'errorlog',
-            'path' => storage_path('logs/error.log'),
-            'level' => env('LOG_LEVEL', 'deubg'),
+            'level' => env('LOG_LEVEL', 'debug'),
         ],
 
         'null' => [

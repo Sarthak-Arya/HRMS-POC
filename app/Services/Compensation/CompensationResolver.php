@@ -3,6 +3,7 @@
 namespace App\Services\Compensation;
 
 use App\Enums\Compensation\CalculationType;
+use App\Enums\Compensation\ComponentType;
 use App\Enums\Compensation\CompensationScopeType;
 use App\Enums\Compensation\OverrideType;
 use App\Models\CompensationComponent;
@@ -26,23 +27,29 @@ class CompensationResolver
      * @param Carbon|null $asOf
      * @return ResolvedCompensation
      */
-    public function resolveForEmployee(Employee $employee, ?Carbon $asOf = null): ResolvedCompensation
-    {
+    public function resolveForEmployee(
+        Employee $employee,
+        ?Carbon $asOf = null,
+        ?int $structureIdOverride = null,
+    ): ResolvedCompensation {
         $asOf = $asOf ?? Carbon::today();
         $employee->loadMissing(['department', 'location']);
 
-        [$structure, $structureSource] = $this->resolveStructure($employee, $asOf);
-        $history = $this->resolveActiveHistory($employee, $asOf);
-
-        $annualCtc = $history?->annual_ctc !== null ? (float) $history->annual_ctc : null;
-        $monthlyGross = $history?->monthly_gross !== null ? (float) $history->monthly_gross : null;
+        if ($structureIdOverride !== null) {
+            $structure = CompensationStructure::query()
+                ->where('company_id', $employee->company_id)
+                ->find($structureIdOverride);
+            $structureSource = 'revision_preview';
+        } else {
+            [$structure, $structureSource] = $this->resolveStructure($employee, $asOf);
+        }
 
         if (!$structure) {
             return new ResolvedCompensation(
                 structureId: null,
                 structureName: null,
-                annualCtc: $annualCtc,
-                monthlyGross: $monthlyGross,
+                annualCtc: null,
+                monthlyGross: null,
                 lines: collect(),
                 structureSource: $structureSource,
             );
@@ -50,14 +57,14 @@ class CompensationResolver
 
         $lines = $this->buildBaseLines($structure);
         $lines = $this->applyOverrides($employee, $lines, $asOf);
-        $lines = $this->calculateAmounts($lines, $annualCtc, $monthlyGross);
+        [$calculatedLines, $monthlyGross, $annualCtc] = $this->resolveAmountsFromStructure($lines);
 
         return new ResolvedCompensation(
             structureId: $structure->id,
             structureName: $structure->structure_name,
             annualCtc: $annualCtc,
             monthlyGross: $monthlyGross,
-            lines: $lines->sortBy('displayOrder')->values(),
+            lines: $calculatedLines->sortBy('displayOrder')->values(),
             structureSource: $structureSource,
         );
     }
@@ -89,7 +96,9 @@ class CompensationResolver
         $lines = $this->buildBaseLines($structure);
         $lines = $this->applyOverridesForScope($companyId, $scopeType, $scopeId, $lines, $asOf);
 
-        return $this->calculateAmounts($lines, $annualCtc, $annualCtc ? $annualCtc / 12 : null);
+        [$calculatedLines] = $this->resolveAmountsFromStructure($lines);
+
+        return $calculatedLines;
     }
 
     /**
@@ -101,11 +110,6 @@ class CompensationResolver
      */
     private function resolveStructure(Employee $employee, Carbon $asOf): array
     {
-        $history = $this->resolveActiveHistory($employee, $asOf);
-        if ($history?->structure) {
-            return [$history->structure, 'employee_history'];
-        }
-
         foreach (CompensationScopeType::structureCascadeOrder() as $scopeType) {
             $scopeId = $this->scopeIdForEmployee($employee, $scopeType);
             if ($scopeType !== CompensationScopeType::COMPANY && $scopeId === null) {
@@ -120,8 +124,13 @@ class CompensationResolver
             );
 
             if ($assignment?->structure) {
-                return [$assignment->structure, $scopeType->value . '_assignment'];
+                return [$assignment->structure, $scopeType->value.'_assignment'];
             }
+        }
+
+        $history = $this->resolveActiveHistory($employee, $asOf);
+        if ($history?->structure) {
+            return [$history->structure, 'employee_history'];
         }
 
         $default = CompensationStructure::where('company_id', $employee->company_id)
@@ -405,18 +414,75 @@ class CompensationResolver
     }
 
     /**
+     * Resolve amounts for a structure without employee overrides (e.g. seeding defaults).
+     *
+     * @return array{0: Collection<int, ResolvedComponentLine>, 1: float, 2: float}
+     */
+    public function resolveStructureAmounts(CompensationStructure $structure): array
+    {
+        $structure->loadMissing('structureComponents.component');
+
+        return $this->resolveAmountsFromStructure($this->buildBaseLines($structure));
+    }
+
+    /**
+     * Derive component amounts, monthly gross, and annual CTC from structure lines only.
+     *
+     * @param Collection<int, array<string, mixed>> $lines
+     * @return array{0: Collection<int, ResolvedComponentLine>, 1: float, 2: float}
+     */
+    public function resolveAmountsFromStructure(Collection $lines): array
+    {
+        $hasPercentCtc = $lines->contains(
+            fn (array $line) => ($line['calculation_type'] ?? null) === CalculationType::PERCENT_CTC
+        );
+
+        $monthlyCtc = null;
+        $calculated = collect();
+
+        $maxAttempts = $hasPercentCtc ? 10 : 1;
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            $calculated = $this->calculateAmounts($lines, $monthlyCtc);
+            $monthlyGross = round(
+                $calculated
+                    ->filter(fn (ResolvedComponentLine $line) => $line->componentType === ComponentType::EARNING)
+                    ->sum(fn (ResolvedComponentLine $line) => $line->monthlyAmount ?? 0),
+                2
+            );
+
+            if (!$hasPercentCtc) {
+                $annualCtc = round($monthlyGross * 12, 2);
+
+                return [$calculated, $monthlyGross, $annualCtc];
+            }
+
+            $nextMonthlyCtc = $monthlyGross;
+            if ($monthlyCtc !== null && abs($nextMonthlyCtc - $monthlyCtc) < 0.01) {
+                break;
+            }
+            $monthlyCtc = $nextMonthlyCtc;
+        }
+
+        $monthlyGross = round(
+            $calculated
+                ->filter(fn (ResolvedComponentLine $line) => $line->componentType === ComponentType::EARNING)
+                ->sum(fn (ResolvedComponentLine $line) => $line->monthlyAmount ?? 0),
+            2
+        );
+        $annualCtc = round($monthlyGross * 12, 2);
+
+        return [$calculated, $monthlyGross, $annualCtc];
+    }
+
+    /**
      * Calculate final amounts for each component line.
      *
      * @param Collection<int, array<string, mixed>> $lines
-     * @param float|null $annualCtc
-     * @param float|null $monthlyGross
      * @return Collection<int, ResolvedComponentLine>
      */
-    private function calculateAmounts(Collection $lines, ?float $annualCtc, ?float $monthlyGross): Collection
+    private function calculateAmounts(Collection $lines, ?float $monthlyCtc = null): Collection
     {
-        $monthlyCtc = $annualCtc ? $annualCtc / 12 : null;
-
-        $basicAmount = $this->resolveBasicAmount($lines, $monthlyCtc, $monthlyGross);
+        $basicAmount = $this->resolveBasicAmount($lines, $monthlyCtc);
 
         return $lines->map(function (array $line) use ($basicAmount, $monthlyCtc) {
             $amount = match ($line['calculation_type']) {
@@ -445,11 +511,8 @@ class CompensationResolver
      * Resolve the amount to be used as 'Basic' for percentage calculations.
      *
      * @param Collection<int, array<string, mixed>> $lines
-     * @param float|null $monthlyCtc
-     * @param float|null $monthlyGross
-     * @return float
      */
-    private function resolveBasicAmount(Collection $lines, ?float $monthlyCtc, ?float $monthlyGross): float
+    private function resolveBasicAmount(Collection $lines, ?float $monthlyCtc): float
     {
         $basicLine = $lines->first(function (array $line) {
             return strcasecmp($line['component_name'], 'Basic') === 0
@@ -458,10 +521,6 @@ class CompensationResolver
 
         if ($basicLine) {
             return (float) ($basicLine['value'] ?? 0);
-        }
-
-        if ($monthlyGross) {
-            return $monthlyGross;
         }
 
         return $monthlyCtc ?? 0;

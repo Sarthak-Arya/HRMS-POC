@@ -24,6 +24,7 @@ use App\Models\PayrollAdjustment;
 use App\Models\PayrollRun;
 use App\Models\StructureComponent;
 use App\Models\User;
+use App\Services\Attendance\AttendanceSetupService;
 use App\Services\Payroll\PayrollGenerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -40,6 +41,8 @@ class PayrollGenerationTest extends TestCase
 
     private CompensationComponent $pfComponent;
 
+    private CompensationComponent $bonusComponent;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -47,7 +50,7 @@ class PayrollGenerationTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        $this->company = Company::factory()->create(['company_handled_by' => $user->id]);
+        $this->company = Company::factory()->ownedBy($user)->create();
         $department = Department::factory()->create(['company_id' => $this->company->id]);
         $location = Location::factory()->create(['company_id' => $this->company->id]);
 
@@ -66,6 +69,15 @@ class PayrollGenerationTest extends TestCase
             'default_calculation_type' => CalculationType::PERCENT_BASIC,
             'default_value' => 12,
             'display_order' => 2,
+        ]);
+
+        $this->bonusComponent = CompensationComponent::create([
+            'company_id' => $this->company->id,
+            'component_name' => 'Performance Bonus',
+            'component_type' => ComponentType::EARNING,
+            'default_calculation_type' => CalculationType::FIXED,
+            'is_payroll_adjustment' => true,
+            'display_order' => 10,
         ]);
 
         $structure = CompensationStructure::create([
@@ -114,12 +126,17 @@ class PayrollGenerationTest extends TestCase
             'effective_from' => now()->subYear()->toDateString(),
         ]);
 
+        app(AttendanceSetupService::class)->seedCompanyDefaults($this->company->id);
+
         MonthlyAttendance::create([
             'employee_id' => $this->employee->id,
             'company_id' => $this->company->id,
             'month' => 6,
             'year' => 2026,
+            'entry_source' => 'manual',
             'total_days' => 30,
+            'working_days' => 30,
+            'present_days' => 28,
             'worked_days' => 28,
         ]);
     }
@@ -138,6 +155,75 @@ class PayrollGenerationTest extends TestCase
         $this->assertCount(2, $payroll->lines);
     }
 
+    public function test_process_employee_uses_assigned_structure_over_seeded_history(): void
+    {
+        $premiumStructure = CompensationStructure::create([
+            'company_id' => $this->company->id,
+            'structure_name' => 'Premium Assigned',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+
+        StructureComponent::create([
+            'structure_id' => $premiumStructure->id,
+            'component_id' => $this->basicComponent->id,
+            'value' => 50000,
+            'calculation_type' => CalculationType::FIXED,
+            'display_order' => 1,
+        ]);
+
+        StructureComponent::create([
+            'structure_id' => $premiumStructure->id,
+            'component_id' => $this->pfComponent->id,
+            'value' => 12,
+            'calculation_type' => CalculationType::PERCENT_BASIC,
+            'display_order' => 2,
+        ]);
+
+        CompensationStructureAssignment::create([
+            'company_id' => $this->company->id,
+            'scope_type' => CompensationScopeType::EMPLOYEE,
+            'scope_id' => $this->employee->id,
+            'structure_id' => $premiumStructure->id,
+            'effective_from' => now()->subYear()->toDateString(),
+        ]);
+
+        $service = app(PayrollGenerationService::class);
+        $run = $service->findOrCreateRun($this->company->id, 6, 2026);
+        $payroll = $service->processEmployee($run, $this->employee);
+
+        $this->assertNotNull($payroll);
+        $basicLine = $payroll->lines->firstWhere('component_id', $this->basicComponent->id);
+        $this->assertNotNull($basicLine);
+        $this->assertEqualsWithDelta(46666.67, (float) $basicLine->calculated_amount, 0.05);
+        $this->assertSame(
+            $premiumStructure->id,
+            EmployeeCompensationHistory::find($payroll->employee_compensation_id)?->structure_id,
+        );
+    }
+
+    public function test_process_employee_provisions_history_from_structure_assignment(): void
+    {
+        EmployeeCompensationHistory::query()->where('employee_id', $this->employee->id)->delete();
+
+        $service = app(PayrollGenerationService::class);
+        $run = $service->findOrCreateRun($this->company->id, 6, 2026);
+
+        $payroll = $service->processEmployee($run, $this->employee);
+
+        $this->assertNotNull($payroll);
+        $this->assertDatabaseHas('employee_compensation_history', [
+            'employee_id' => $this->employee->id,
+            'structure_id' => $payroll->employee_compensation_id
+                ? EmployeeCompensationHistory::find($payroll->employee_compensation_id)?->structure_id
+                : null,
+        ]);
+        $this->assertStringContainsString(
+            'Auto-provisioned',
+            (string) EmployeeCompensationHistory::find($payroll->employee_compensation_id)?->revision_reason,
+        );
+    }
+
     public function test_adjustment_and_loan_affect_net_pay(): void
     {
         $service = app(PayrollGenerationService::class);
@@ -146,6 +232,7 @@ class PayrollGenerationTest extends TestCase
         PayrollAdjustment::create([
             'employee_id' => $this->employee->id,
             'payroll_run_id' => $run->id,
+            'component_id' => $this->bonusComponent->id,
             'adjustment_type' => PayrollAdjustmentType::ADDITION,
             'amount' => 5000,
             'remarks' => 'Bonus',
@@ -165,7 +252,7 @@ class PayrollGenerationTest extends TestCase
 
         $payroll = $service->processEmployee($run, $this->employee);
         $this->assertNotNull($payroll);
-        $this->assertTrue($payroll->lines->contains(fn ($line) => str_contains($line->component_name, 'Bonus') || str_contains($line->component_name, 'Adjustment')));
+        $this->assertTrue($payroll->lines->contains(fn ($line) => $line->component_name === 'Performance Bonus'));
         $this->assertTrue($payroll->lines->contains(fn ($line) => str_contains($line->component_name, 'EMI')));
     }
 

@@ -5,6 +5,7 @@ namespace App\Services\Ai\Tools;
 use App\Enums\Permission;
 use App\Models\User;
 use App\Services\Ai\Contracts\AiTool;
+use App\Services\Attendance\AttendanceCommandService;
 use App\Services\Attendance\AttendanceService;
 use Illuminate\Validation\ValidationException;
 
@@ -223,7 +224,7 @@ class UpsertAttendanceTool implements AiTool
         }
 
         try {
-            $result = app(AttendanceService::class)->upsertFromAgent($companyId, $args);
+            $result = app(AttendanceCommandService::class)->upsertMonthlyRecord($companyId, $args);
 
             return ['success' => true, ...$result];
         } catch (ValidationException $e) {
@@ -293,7 +294,7 @@ class BulkUpsertAttendanceTool implements AiTool
             return ['success' => false, 'error' => 'No attendance records provided.'];
         }
 
-        $result = app(AttendanceService::class)->bulkUpsertFromAgent($companyId, $records);
+        $result = app(AttendanceCommandService::class)->importMonthly($companyId, $records);
 
         return [
             'success' => $result['failed'] === 0,

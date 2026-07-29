@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Enums\Compensation\CalculationType;
+use App\Enums\Compensation\ComponentType;
 use App\Enums\Payroll\EmployeeLoanStatus;
 use App\Enums\Payroll\EmployeePayrollStatus;
 use App\Enums\Payroll\PayrollAdjustmentType;
@@ -18,6 +20,7 @@ use App\Models\MonthlyAttendance;
 use App\Models\PayrollAdjustment;
 use App\Models\PayrollRun;
 use App\Models\User;
+use App\Services\Attendance\AttendanceSetupService;
 use Illuminate\Database\Seeder;
 
 class PayrollV2Seeder extends Seeder
@@ -46,6 +49,8 @@ class PayrollV2Seeder extends Seeder
         $month = 6;
         $year = 2026;
 
+        app(AttendanceSetupService::class)->seedCompanyDefaults($company->id);
+
         $attendance = MonthlyAttendance::query()->firstOrCreate(
             [
                 'employee_id' => $employee->id,
@@ -54,14 +59,20 @@ class PayrollV2Seeder extends Seeder
                 'year' => $year,
             ],
             [
+                'entry_source' => 'manual',
                 'total_days' => 30,
+                'working_days' => 30,
+                'present_days' => 28,
                 'worked_days' => 28,
-                'casual_leave' => 1,
-                'earned_leave' => 0,
-                'sick_leave' => 1,
-                'holiday' => 0,
+                'holiday_days' => 0,
             ],
         );
+
+        $attendance->syncLeaveBreakdown([
+            'CL' => 1,
+            'EL' => 0,
+            'SL' => 1,
+        ]);
 
         $processedBy = User::query()->first();
 
@@ -129,14 +140,31 @@ class PayrollV2Seeder extends Seeder
         );
 
         if ($processedBy !== null) {
+            $bonusComponent = CompensationComponent::query()->firstOrCreate(
+                [
+                    'company_id' => $company->id,
+                    'component_name' => 'Performance Bonus',
+                ],
+                [
+                    'component_type' => ComponentType::EARNING,
+                    'default_calculation_type' => CalculationType::FIXED,
+                    'is_taxable' => true,
+                    'is_active' => true,
+                    'is_payroll_adjustment' => true,
+                    'display_order' => 101,
+                    'created_by' => $processedBy->id,
+                ],
+            );
+
             PayrollAdjustment::query()->firstOrCreate(
                 [
                     'employee_id' => $employee->id,
                     'payroll_run_id' => $run->id,
-                    'adjustment_type' => PayrollAdjustmentType::ADDITION,
-                    'amount' => 5000,
+                    'component_id' => $bonusComponent->id,
                 ],
                 [
+                    'adjustment_type' => PayrollAdjustmentType::ADDITION,
+                    'amount' => 5000,
                     'remarks' => 'Performance bonus',
                     'created_by' => $processedBy->id,
                 ],

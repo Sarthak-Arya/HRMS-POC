@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Auth;
 
+use App\Services\Auth\AuthLandingService;
 use Livewire\Component;
 use App\Models\User;
 
@@ -14,18 +15,19 @@ class ForgotPassword extends Component
 
     public $email = '';
 
-    public $showSuccesNotification = false; 
+    public $showSuccesNotification = false;
     public $showFailureNotification = false;
 
     public $showDemoNotification = false;
 
     protected $rules = [
         'email' => 'required|email',
-    ];  
+    ];
 
-    public function mount() {
-        if(auth()->user()){
-            redirect('/view-companies');
+    public function mount(AuthLandingService $landing)
+    {
+        if (auth()->user()) {
+            redirect()->to($landing->homeRoute(auth()->user()));
         }
     }
 

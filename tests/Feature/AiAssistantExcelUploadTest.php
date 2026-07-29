@@ -31,7 +31,7 @@ class AiAssistantExcelUploadTest extends TestCase
         $this->seed(PermissionSeeder::class);
 
         $this->user = User::factory()->hrManager()->create();
-        $this->company = Company::factory()->create(['company_handled_by' => $this->user->id]);
+        $this->company = Company::factory()->ownedBy($this->user)->create();
 
         Config::set('filesystems.disks.tmp-for-tests', [
             'driver' => 'local',

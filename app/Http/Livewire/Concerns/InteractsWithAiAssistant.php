@@ -152,6 +152,12 @@ trait InteractsWithAiAssistant
         $this->input = trim($text);
     }
 
+    public function applySuggestion(string $text): void
+    {
+        $this->input = trim($text);
+        $this->dispatchBrowserEvent('ai-suggestion-applied');
+    }
+
     public function newConversation(): void
     {
         $this->conversationId = null;

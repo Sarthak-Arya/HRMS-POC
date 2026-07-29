@@ -25,10 +25,14 @@
                     </nav>
                 </div>
                 <div class="navbar-actions d-flex align-items-center flex-shrink-0">
-                    @if (in_array(request()->route()->getName(), ['view-companies']))
-                        <a class="btn btn-dark btn-sm text-nowrap" href="{{ route('add-company-details') }}">Add New Company</a>
-                    @elseif (in_array(request()->route()->getName(), ['add-company-details']))
-                        <a class="btn btn-dark btn-sm text-nowrap" href="{{ route('view-companies') }}">View All Companies</a>
+                    @if (request()->route()->getName() === 'view-companies')
+                        @can('companies.create')
+                            <a class="btn btn-dark btn-sm text-nowrap" href="{{ route('add-company-details') }}">Add New Company</a>
+                        @endcan
+                    @elseif (request()->route()->getName() === 'add-company-details')
+                        @can('companies.manage_multiple')
+                            <a class="btn btn-dark btn-sm text-nowrap" href="{{ route('view-companies') }}">View All Companies</a>
+                        @endcan
                     @endif
 
                     <x-theme-toggle wrapper="div" />

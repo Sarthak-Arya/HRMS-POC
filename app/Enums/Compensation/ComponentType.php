@@ -6,4 +6,5 @@ enum ComponentType: string
 {
     case EARNING = 'EARNING';
     case DEDUCTION = 'DEDUCTION';
+    case BENEFIT = 'BENEFIT';
 }

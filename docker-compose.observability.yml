@@ -1,0 +1,161 @@
+# Enterprise Observability Stack
+#
+# Start:
+#   docker compose -f docker-compose.observability.yml up -d
+#
+# UI endpoints (bind to localhost by default):
+#   Grafana:        http://localhost:3000  (admin / see GRAFANA_ADMIN_PASSWORD)
+#   Kibana:         http://localhost:5601
+#   Prometheus:     http://localhost:9090
+#   Alertmanager:   http://localhost:9093
+#   OTel Collector: http://localhost:4318 (OTLP HTTP)
+#
+# Application should export:
+#   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+#   LOG_CHANNEL=stderr_json  (or stack including stderr_json)
+#   Mount/ship storage/logs via Filebeat when using file channels
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - cluster.name=payroll-observability
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+      - ./observability/elasticsearch/index-templates.json:/usr/share/elasticsearch/config/index-templates.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+    networks:
+      - observability
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.3
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_NAME=payroll-kibana
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - observability
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.15.3
+    user: root
+    command: ["filebeat", "-e", "--strict.perms=false"]
+    volumes:
+      - ./observability/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./storage/logs:/var/log/payroll:ro
+      - filebeat_data:/usr/share/filebeat/data
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - observability
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - otel-collector
+      - alertmanager
+    networks:
+      - observability
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    networks:
+      - observability
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    ports:
+      - "3200:3200"
+    volumes:
+      - ./observability/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/var/tempo
+    networks:
+      - observability
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8889:8889"
+    volumes:
+      - ./observability/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+    depends_on:
+      - tempo
+    networks:
+      - observability
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-changeme}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000}
+      MYSQL_ANALYTICS_HOST: ${MYSQL_ANALYTICS_HOST:-host.docker.internal}
+      MYSQL_ANALYTICS_PORT: ${MYSQL_ANALYTICS_PORT:-3306}
+      MYSQL_ANALYTICS_DB: ${MYSQL_ANALYTICS_DB:-payroll}
+      MYSQL_ANALYTICS_USER: ${MYSQL_ANALYTICS_USER:-grafana_ro}
+      MYSQL_ANALYTICS_PASSWORD: ${MYSQL_ANALYTICS_PASSWORD:-changeme}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - tempo
+      - elasticsearch
+      - alertmanager
+    networks:
+      - observability
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  es_data:
+  filebeat_data:
+  prometheus_data:
+  tempo_data:
+  grafana_data:
+
+networks:
+  observability:
+    driver: bridge

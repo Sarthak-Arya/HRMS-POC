@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  push:
+    branches: [master, main, develop]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, pdo, pdo_sqlite, redis, gd
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          mkdir -p storage/logs bootstrap/cache
+          chmod -R 777 storage bootstrap/cache
+
+      - name: Unit tests (observability + suite)
+        env:
+          APP_ENV: testing
+          OTEL_ENABLED: false
+          OTEL_EXPORT_DISABLED: true
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ':memory:'
+          CACHE_DRIVER: array
+          QUEUE_CONNECTION: sync
+          SESSION_DRIVER: array
+        run: vendor/bin/phpunit --testsuite Unit
+
+      - name: Validate observability compose file
+        run: docker compose -f docker-compose.observability.yml config >/dev/null
+
+      - name: Validate Prometheus alert rules syntax (promtool if available)
+        run: |
+          if command -v promtool >/dev/null 2>&1; then
+            promtool check rules observability/prometheus/alerts.yml
+          else
+            echo "promtool not installed; skipped"
+          fi

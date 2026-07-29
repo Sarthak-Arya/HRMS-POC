@@ -37,7 +37,7 @@ class CompensationAssignmentTest extends TestCase
 
         $user = User::factory()->create();
         $this->actingAs($user);
-        $this->company = Company::factory()->create(['company_handled_by' => $user->id]);
+        $this->company = Company::factory()->ownedBy($user)->create();
 
         $this->basicComponent = CompensationComponent::create([
             'company_id' => $this->company->id,

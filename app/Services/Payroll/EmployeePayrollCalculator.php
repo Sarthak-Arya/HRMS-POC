@@ -7,12 +7,12 @@ use App\Enums\Payroll\EmployeeLoanStatus;
 use App\Enums\Payroll\PayrollAdjustmentType;
 use App\Enums\Payroll\PayrollLineComponentType;
 use App\Models\Employee;
-use App\Models\EmployeeCompensationHistory;
 use App\Models\EmployeeLoan;
 use App\Models\MonthlyAttendance;
 use App\Models\PayrollAdjustment;
 use App\Models\PayrollRun;
 use App\Services\Compensation\CompensationResolver;
+use App\Services\Compensation\EmployeeCompensationService;
 use App\Services\Compensation\ResolvedComponentLine;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -21,21 +21,20 @@ class EmployeePayrollCalculator
 {
     public function __construct(
         private readonly CompensationResolver $compensationResolver,
-    ) {}
+        private readonly EmployeeCompensationService $employeeCompensationService,
+    ) {
+    }
 
     public function calculate(Employee $employee, PayrollRun $run, MonthlyAttendance $attendance): CalculatedPayrollResult
     {
         $asOf = Carbon::create($run->year, $run->month)->endOfMonth();
         $resolved = $this->compensationResolver->resolveForEmployee($employee, $asOf);
 
-        $compensationHistory = EmployeeCompensationHistory::query()
-            ->where('employee_id', $employee->id)
-            ->where('effective_from', '<=', $asOf)
-            ->where(function ($query) use ($asOf) {
-                $query->whereNull('effective_to')->orWhere('effective_to', '>=', $asOf);
-            })
-            ->orderByDesc('effective_from')
-            ->firstOrFail();
+        $compensationHistory = $this->employeeCompensationService->resolveOrProvisionForPayroll(
+            $employee,
+            $asOf,
+            $resolved,
+        );
 
         $prorationFactor = $this->resolveProrationFactor($attendance);
         $lines = $this->buildCompensationLines($resolved->lines, $prorationFactor, $attendance);
@@ -45,7 +44,8 @@ class EmployeePayrollCalculator
         $loanData = $loanResult['installments'];
 
         $grossEarnings = $this->sumByType($lines, PayrollLineComponentType::EARNING);
-        $grossDeductions = $this->sumByType($lines, PayrollLineComponentType::DEDUCTION);
+        $grossDeductions = $this->sumByType($lines, PayrollLineComponentType::DEDUCTION)
+            + $this->sumByType($lines, PayrollLineComponentType::BENEFIT);
         $employerContributions = $this->sumByType($lines, PayrollLineComponentType::EMPLOYER_CONTRIBUTION);
         $netPay = round($grossEarnings - $grossDeductions, 2);
 
@@ -179,7 +179,7 @@ class EmployeePayrollCalculator
 
             $lines[] = [
                 'component_id' => null,
-                'component_name' => $loan->loan_name.' EMI',
+                'component_name' => $loan->loan_name . ' EMI',
                 'component_type' => PayrollLineComponentType::DEDUCTION,
                 'calculated_amount' => $deductionAmount,
                 'calculation_basis' => [
@@ -207,7 +207,7 @@ class EmployeePayrollCalculator
     private function sumByType(array $lines, PayrollLineComponentType $type): float
     {
         return round(collect($lines)
-            ->filter(fn (array $line) => $line['component_type'] === $type)
+            ->filter(fn(array $line) => $line['component_type'] === $type)
             ->sum('calculated_amount'), 2);
     }
 
@@ -216,6 +216,7 @@ class EmployeePayrollCalculator
         return match ($type) {
             ComponentType::EARNING => PayrollLineComponentType::EARNING,
             ComponentType::DEDUCTION => PayrollLineComponentType::DEDUCTION,
+            ComponentType::BENEFIT => PayrollLineComponentType::BENEFIT,
         };
     }
 }

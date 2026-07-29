@@ -3,6 +3,7 @@
 namespace App\Http\Livewire;
 
 use App\Enums\Payroll\PayrollRunStatus;
+use App\Models\Company;
 use App\Models\PayrollRun;
 use App\Services\Payroll\PayrollGenerationService;
 use App\Services\Payroll\PayrollReadinessService;
@@ -103,10 +104,13 @@ class PayrollRunList extends Component
             $readiness = app(PayrollReadinessService::class)->assess($existingDraft);
         }
 
+        $company = Company::query()->find($companyId);
+
         return view('livewire.payroll-run-list', [
             'runs' => $runs,
             'statusCounts' => $statusCounts,
             'readiness' => $readiness,
+            'companyName' => $company?->company_name ?? 'Company',
             'monthOptions' => collect(range(1, 12))->mapWithKeys(fn ($m) => [$m => Carbon::create(null, $m)->format('F')]),
         ]);
     }

@@ -1,171 +1,129 @@
-<div class="card">
-    <div class="card-header pb-0">
-        <div class="row">
-            <div class="col-md-6">
-                <h6>Employees List</h6>
+<main class="main-content ui-page">
+    <div class="container-fluid py-4">
+        <section class="ui-page-header">
+            <div>
+                <h1 class="ui-page-title">Employees</h1>
+                <p class="ui-page-subtitle">
+                    {{ $companyName }}<span class="ui-page-subtitle-sep">|</span>
+                    Search, filter, and manage your workforce records.
+                </p>
             </div>
-            <div class="col-md-6">
-                <div class="row">
-                    <div class="col-md-12 mb-3">
-                        <div class="form-group">
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                <input type="text" wire:model.debounce.300ms="search" class="form-control" placeholder="Search by name/code...">
-                            </div>
-                        </div>
+            @canany(['employees.create', 'employees.edit'])
+                <div class="ui-page-actions">
+                    <a href="{{ route('add-employee-details', ['company_id' => $companyId]) }}" class="ui-btn-primary">
+                        <span class="material-symbols-outlined" style="font-size: 1.125rem;">person_add</span>
+                        Add Employee
+                    </a>
+                </div>
+            @endcanany
+        </section>
+
+        <section class="ui-card">
+            <div class="ui-card-toolbar">
+                <div class="ui-search-field flex-grow-1" style="max-width: 22rem;">
+                    <span class="material-symbols-outlined">search</span>
+                    <input type="text"
+                        wire:model.debounce.300ms="search"
+                        class="ui-search-input"
+                        placeholder="Search by name or employee code...">
+                </div>
+            </div>
+
+            <div class="ui-card-body border-bottom">
+                <div class="ui-filter-grid">
+                    <div>
+                        <label class="form-label">Designation</label>
+                        <select wire:model="selectedDesignation" class="form-control form-select">
+                            <option value="">All Designations</option>
+                            @foreach($designations as $designation)
+                                <option value="{{ $designation->id }}">{{ $designation->designation_name }}</option>
+                            @endforeach
+                        </select>
                     </div>
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label class="form-control-label">Filter by Designation</label>
-                            <select wire:model="selectedDesignation" class="form-control">
-                                <option value="">All Designations</option>
-                                @foreach($designations as $designation)
-                                    <option value="{{ $designation->id }}">{{ $designation->designation_name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    <div>
+                        <label class="form-label">Department</label>
+                        <select wire:model="selectedDepartment" class="form-control form-select">
+                            <option value="">All Departments</option>
+                            @foreach($departments as $department)
+                                <option value="{{ $department->id }}">{{ $department->department_name }}</option>
+                            @endforeach
+                        </select>
                     </div>
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label class="form-control-label">Filter by Department</label>
-                            <select wire:model="selectedDepartment" class="form-control">
-                                <option value="">All Departments</option>
-                                @foreach($departments as $department)
-                                    <option value="{{ $department->id }}">{{ $department->department_name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    <div>
+                        <label class="form-label">Location</label>
+                        <select wire:model="selectedLocation" class="form-control form-select">
+                            <option value="">All Locations</option>
+                            @foreach($locations as $location)
+                                <option value="{{ $location->id }}">{{ $location->name }}</option>
+                            @endforeach
+                        </select>
                     </div>
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label class="form-control-label">Filter by Location</label>
-                            <select wire:model="selectedLocation" class="form-control">
-                                <option value="">All Locations</option>
-                                @foreach($locations as $location)
-                                    <option value="{{ $location->id }}">{{ $location->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="form-group">
-                            <label class="form-control-label">Filter by Status</label>
-                            <select wire:model="selectedStatus" class="form-control">
-                                <option value="">All Status</option>
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
-                        </div>
+                    <div>
+                        <label class="form-label">Status</label>
+                        <select wire:model="selectedStatus" class="form-control form-select">
+                            <option value="">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-    <div class="card-body px-0 pt-0 pb-2">
-        <div class="table-responsive p-0">
-            @if($employees->count() > 0)
-                <table class="table align-items-center mb-0">
+
+            <div class="ui-data-table-wrap">
+                <table class="ui-data-table">
                     <thead>
-                            <tr>
-                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Employee Code</th>
-                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Full Name</th>
-                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Designation</th>
-                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Department</th>
-                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Location</th>
-                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Joining Date</th>
-                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Status</th>
-                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Actions</th>
+                        <tr>
+                            <th>Employee Code</th>
+                            <th>Full Name</th>
+                            <th>Designation</th>
+                            <th>Department</th>
+                            <th>Location</th>
+                            <th>Joining Date</th>
+                            <th>Status</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($employees as $employee)
+                        @forelse($employees as $employee)
                             <tr>
+                                <td class="text-code">{{ $employee->employee_code }}</td>
+                                <td class="text-name">{{ $employee->employee_name }}</td>
+                                <td>{{ $employee->designation->designation_name ?? 'N/A' }}</td>
+                                <td>{{ $employee->department->department_name ?? 'N/A' }}</td>
+                                <td>{{ $employee->location->name ?? 'N/A' }}</td>
+                                <td>{{ optional($employee->doj)->format('d/m/Y') ?? 'N/A' }}</td>
                                 <td>
-                                    <div class="d-flex px-2 py-1">
-                                        <div class="d-flex flex-column justify-content-center">
-                                            <h6 class="mb-0 text-sm">{{ $employee->employee_code }}</h6>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="d-flex px-2 py-1">
-                                        <div class="d-flex flex-column justify-content-center">
-                                            <h6 class="mb-0 text-sm">{{ $employee->employee_name }}</h6>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <p class="text-xs font-weight-bold mb-0">{{ $employee->designation->designation_name ?? 'N/A' }}</p>
-                                </td>
-                                <td>
-                                    <p class="text-xs font-weight-bold mb-0">{{ $employee->department->department_name ?? 'N/A' }}</p>
-                                </td>
-                                <td>
-                                    <p class="text-xs font-weight-bold mb-0">{{ $employee->location->name ?? 'N/A' }}</p>
-                                </td>
-                                <td>
-                                    <p class="text-xs font-weight-bold mb-0">{{ optional($employee->doj)->format('d/m/Y') ?? 'N/A' }}</p>
-                                </td>
-                                <td>
-                                    <span class="badge badge-sm {{ $employee->dol ? 'bg-gradient-danger' : 'bg-gradient-success' }}">
+                                    <span class="ui-badge {{ $employee->dol ? 'ui-badge--danger' : 'ui-badge--success' }}">
                                         {{ $employee->dol ? 'Inactive' : 'Active' }}
                                     </span>
                                 </td>
-                                <td class="align-middle">
+                                <td class="text-end text-nowrap">
                                     <a href="{{ route('employee-details', ['company_id' => $companyId, 'employee_id' => $employee->id]) }}"
-                                        class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="View employee">
-                                        <i class="fas fa-eye text-info me-2"></i>
+                                        class="ui-link-btn"
+                                        title="View employee">
+                                        View
                                     </a>
-                                    {{-- <a href="{{ route('view-employee-details', ['employee_id' => $employee->id]) }}" class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="View employee">
-                                        <i class="fas fa-eye text-info me-2"></i>
-                                    </a> --}}
-                                    <a href="{{ route('edit-employee-details', ['company_id' => $companyId, 'employee_id' => $employee->id]) }}"
-                                        class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Edit employee">
-                                        <i class="fas fa-edit text-warning"></i>
-                                    </a>
+                                    @canany(['employees.create', 'employees.edit'])
+                                        <a href="{{ route('edit-employee-details', ['company_id' => $companyId, 'employee_id' => $employee->id]) }}"
+                                            class="ui-link-btn ms-2"
+                                            title="Edit employee">
+                                            Edit
+                                        </a>
+                                    @endcanany
                                 </td>
                             </tr>
-                        @endforeach
+                        @empty
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted">No employees found.</td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
-            @else
-                <div class="text-center p-4">
-                    <p class="text-muted">No employees found</p>
-                </div>
-            @endif
-        </div>
-    </div>
-    <div class="card-footer">
-        <div class="d-flex justify-content-center">
-            {{ $employees->links() }}
-        </div>
-    </div>
-</div>
+            </div>
 
-<style>
-    .pagination {
-        margin-bottom: 0;
-    }
-    .page-link {
-        position: relative;
-        display: block;
-        padding: 0.5rem 0.75rem;
-        margin-left: -1px;
-        line-height: 1.25;
-        color: var(--hrms-text-primary, #344767);
-        background-color: var(--hrms-card-bg, #fff);
-        border: 1px solid var(--hrms-border-color, #dee2e6);
-    }
-    .page-item.active .page-link {
-        z-index: 3;
-        color: #fff;
-        background-color: #344767;
-        border-color: #344767;
-    }
-    .page-item.disabled .page-link {
-        color: var(--hrms-text-muted, #6c757d);
-        pointer-events: none;
-        background-color: var(--hrms-surface-bg, #fff);
-        border-color: var(--hrms-border-color, #dee2e6);
-    }
-</style> 
+            <div class="ui-pagination-wrap d-flex justify-content-center">
+                {{ $employees->links() }}
+            </div>
+        </section>
+    </div>
+</main>

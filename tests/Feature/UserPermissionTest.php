@@ -29,16 +29,26 @@ class UserPermissionTest extends TestCase
         $matrix = RolePermissions::matrix();
 
         $this->assertContains(Permission::UsersManage->value, $matrix[UserRole::Admin->value]);
+        $this->assertContains(Permission::UsersManage->value, $matrix[UserRole::B2bAdmin->value]);
+        $this->assertNotContains(Permission::UsersManage->value, $matrix[UserRole::B2bStaff->value]);
         $this->assertNotContains(Permission::UsersManage->value, $matrix[UserRole::PayrollManager->value]);
+        $this->assertContains(Permission::CompaniesManageMultiple->value, $matrix[UserRole::B2bAdmin->value]);
+        $this->assertContains(Permission::CompaniesManageMultiple->value, $matrix[UserRole::B2bStaff->value]);
+        $this->assertNotContains(Permission::CompaniesManageMultiple->value, $matrix[UserRole::CompanyAdmin->value]);
+        $this->assertContains(Permission::CompaniesCreate->value, $matrix[UserRole::CompanyAdmin->value]);
+        $this->assertNotContains(Permission::CompaniesCreate->value, $matrix[UserRole::B2bStaff->value]);
         $this->assertContains(Permission::CompensationManage->value, $matrix[UserRole::Accountant->value]);
         $this->assertNotContains(Permission::CompensationManage->value, $matrix[UserRole::HrManager->value]);
         $this->assertNotContains(Permission::SalaryGenerate->value, $matrix[UserRole::Viewer->value]);
+        $this->assertContains(Permission::ReportsManage->value, $matrix[UserRole::CompanyAdmin->value]);
+        $this->assertNotContains(Permission::ReportsManage->value, $matrix[UserRole::PayrollManager->value]);
+        $this->assertNotContains(Permission::ReportsManage->value, $matrix[UserRole::HrManager->value]);
     }
 
     public function test_viewer_cannot_open_salary_generator(): void
     {
         $viewer = User::factory()->viewer()->create();
-        $company = Company::factory()->create(['company_handled_by' => $viewer->id]);
+        $company = Company::factory()->ownedBy($viewer)->create();
 
         $response = $this->actingAs($viewer)->get(route('salary-generator', ['company_id' => $company->id]));
 
@@ -48,7 +58,7 @@ class UserPermissionTest extends TestCase
     public function test_accountant_can_open_compensation_but_not_add_employee(): void
     {
         $accountant = User::factory()->accountant()->create();
-        $company = Company::factory()->create(['company_handled_by' => $accountant->id]);
+        $company = Company::factory()->ownedBy($accountant)->create();
 
         $this->actingAs($accountant)
             ->get(route('compensation', ['company_id' => $company->id]))
@@ -62,7 +72,7 @@ class UserPermissionTest extends TestCase
     public function test_hr_manager_can_manage_employees_and_attendance(): void
     {
         $hrManager = User::factory()->hrManager()->create();
-        $company = Company::factory()->create(['company_handled_by' => $hrManager->id]);
+        $company = Company::factory()->ownedBy($hrManager)->create();
 
         $this->actingAs($hrManager)
             ->get(route('add-employee-details', ['company_id' => $company->id]))
@@ -70,6 +80,10 @@ class UserPermissionTest extends TestCase
 
         $this->actingAs($hrManager)
             ->get(route('attendance-entry', ['company_id' => $company->id]))
+            ->assertRedirect(route('attendance', ['company_id' => $company->id]));
+
+        $this->actingAs($hrManager)
+            ->get(route('attendance', ['company_id' => $company->id]))
             ->assertOk();
 
         $this->actingAs($hrManager)

@@ -5,29 +5,68 @@ namespace App\Http\Controllers;
 use App\Enums\Payroll\PayrollLineComponentType;
 use App\Models\EmployeePayroll;
 use App\Models\PayrollRun;
+use App\Services\Observability\DomainTelemetry;
 use Carbon\Carbon;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\View;
+use Throwable;
 
 class PayslipController extends Controller
 {
-    public function download(string $company_id, int $run_id, int $employee_payroll_id): Response
+    public function download(string $company_id, int $run_id, int $employee_payroll_id, DomainTelemetry $telemetry): Response
     {
-        $data = $this->buildPayslipData((int) $company_id, $run_id, $employee_payroll_id);
+        try {
+            $data = $this->buildPayslipData((int) $company_id, $run_id, $employee_payroll_id);
+            $response = $this->pdfResponse(View::make('payroll.payslip-pdf', $data)->render(), $data['filename']);
+            $telemetry->emit('export.payslip.downloaded', 'audit', 'success', [
+                'company.id' => (int) $company_id,
+                'payroll.run_id' => $run_id,
+                'artifact_type' => 'payslip',
+                'format' => 'pdf',
+                'row_count' => 1,
+            ]);
 
-        return $this->pdfResponse(View::make('payroll.payslip-pdf', $data)->render(), $data['filename']);
+            return $response;
+        } catch (Throwable $e) {
+            $telemetry->emit('export.payslip.downloaded', 'audit', 'failure', [
+                'company.id' => (int) $company_id,
+                'payroll.run_id' => $run_id,
+                'artifact_type' => 'payslip',
+                'error.type' => $e::class,
+            ], 'error');
+            throw $e;
+        }
     }
 
-    public function downloadBulk(string $company_id, int $run_id): Response
+    public function downloadBulk(string $company_id, int $run_id, DomainTelemetry $telemetry): Response
     {
-        $run = PayrollRun::query()->where('company_id', $company_id)->findOrFail($run_id);
-        $pages = $run->employeePayrolls()->with(['employee', 'lines'])->get()
-            ->map(fn ($payroll) => $this->buildPayslipData((int) $company_id, $run_id, $payroll->id))
-            ->all();
+        try {
+            $run = PayrollRun::query()->where('company_id', $company_id)->findOrFail($run_id);
+            $pages = $run->employeePayrolls()->with(['employee', 'lines'])->get()
+                ->map(fn ($payroll) => $this->buildPayslipData((int) $company_id, $run_id, $payroll->id))
+                ->all();
 
-        $filename = 'payslips-'.Carbon::create($run->year, $run->month)->format('Y-m').'.pdf';
+            $filename = 'payslips-'.Carbon::create($run->year, $run->month)->format('Y-m').'.pdf';
 
-        return $this->pdfResponse(View::make('payroll.payslip-bulk-pdf', ['pages' => $pages])->render(), $filename);
+            $response = $this->pdfResponse(View::make('payroll.payslip-bulk-pdf', ['pages' => $pages])->render(), $filename);
+            $telemetry->emit('export.payslip_bulk.downloaded', 'audit', 'success', [
+                'company.id' => (int) $company_id,
+                'payroll.run_id' => $run_id,
+                'artifact_type' => 'payslip_bulk',
+                'format' => 'pdf',
+                'row_count' => count($pages),
+            ]);
+
+            return $response;
+        } catch (Throwable $e) {
+            $telemetry->emit('export.payslip_bulk.downloaded', 'audit', 'failure', [
+                'company.id' => (int) $company_id,
+                'payroll.run_id' => $run_id,
+                'artifact_type' => 'payslip_bulk',
+                'error.type' => $e::class,
+            ], 'error');
+            throw $e;
+        }
     }
 
     /**
@@ -51,7 +90,7 @@ class PayslipController extends Controller
             'company' => $payroll->employee->company,
             'period' => Carbon::create($run->year, $run->month)->format('F Y'),
             'earnings' => $payroll->lines->where('component_type', PayrollLineComponentType::EARNING),
-            'deductions' => $payroll->lines->where('component_type', PayrollLineComponentType::DEDUCTION),
+            'deductions' => $payroll->lines->whereIn('component_type', [PayrollLineComponentType::DEDUCTION, PayrollLineComponentType::BENEFIT]),
             'employer' => $payroll->lines->where('component_type', PayrollLineComponentType::EMPLOYER_CONTRIBUTION),
             'filename' => 'payslip-'.$payroll->employee->employee_code.'-'.Carbon::create($run->year, $run->month)->format('Y-m').'.pdf',
         ];

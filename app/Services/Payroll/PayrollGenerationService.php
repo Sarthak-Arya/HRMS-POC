@@ -14,6 +14,8 @@ use App\Models\EmployeePayroll;
 use App\Models\EmployeePayrollLine;
 use App\Models\MonthlyAttendance;
 use App\Models\PayrollRun;
+use App\Services\Observability\DomainTelemetry;
+use App\Support\Observability\TelemetryContext;
 use Illuminate\Bus\Batch;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -30,6 +32,7 @@ class PayrollGenerationService
         private readonly PayrollReadinessService $readinessService,
         private readonly PayrollAuditLogger $auditLogger,
         private readonly PayrollHistoryRecorder $historyRecorder,
+        private readonly DomainTelemetry $telemetry,
     ) {}
 
     public function findOrCreateRun(int $companyId, int $month, int $year): PayrollRun
@@ -50,9 +53,21 @@ class PayrollGenerationService
                 $run,
                 AuditEventType::CREATE,
                 null,
-                $run->toArray(),
+                [
+                    'id' => $run->id,
+                    'company_id' => $run->company_id,
+                    'month' => $run->month,
+                    'year' => $run->year,
+                    'status' => $run->status?->value ?? $run->status,
+                ],
                 $companyId,
             );
+            $this->telemetry->emit('payroll.run.created', 'business', 'success', [
+                'company.id' => $companyId,
+                'payroll.run_id' => $run->id,
+                'attendance.month' => $month,
+                'attendance.year' => $year,
+            ]);
         }
 
         return $run;
@@ -75,20 +90,45 @@ class PayrollGenerationService
 
         $employees = $this->readinessService->eligibleEmployees($run, $departmentId, $designationId);
         $stats = ['processed' => 0, 'skipped' => 0, 'failed' => 0, 'skipped_employees' => []];
+        $started = microtime(true);
+
+        $this->telemetry->emit('payroll.run.processing', 'business', 'success', [
+            'company.id' => $run->company_id,
+            'payroll.run_id' => $run->id,
+        ]);
 
         foreach ($employees as $employee) {
             try {
                 $result = $this->processEmployee($run, $employee);
                 if ($result === null) {
                     $stats['skipped']++;
-                    $stats['skipped_employees'][$employee->id] = $employee->employee_name.' (missing prerequisites)';
+                    $stats['skipped_employees'][$employee->id] = 'employee:'.$employee->id.' (missing prerequisites)';
                 } else {
                     $stats['processed']++;
                 }
             } catch (Throwable $e) {
                 $stats['failed']++;
-                $stats['skipped_employees'][$employee->id] = $employee->employee_name.' ('.$e->getMessage().')';
+                $stats['skipped_employees'][$employee->id] = 'employee:'.$employee->id.' (processing_error)';
             }
+        }
+
+        $this->telemetry->emit(
+            $stats['failed'] > 0 ? 'payroll.run.failed' : 'payroll.run.completed',
+            'business',
+            $stats['failed'] > 0 ? 'failure' : 'success',
+            [
+                'company.id' => $run->company_id,
+                'payroll.run_id' => $run->id,
+                'processed_count' => $stats['processed'],
+                'failed_count' => $stats['failed'],
+                'skipped_count' => $stats['skipped'],
+                'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+            ],
+            $stats['failed'] > 0 ? 'error' : 'info'
+        );
+
+        if ($stats['failed'] > 0) {
+            $this->telemetry->markBatchFailed();
         }
 
         return $stats;
@@ -111,11 +151,43 @@ class PayrollGenerationService
         $jobs = $employees->map(fn (Employee $employee) => new ProcessEmployeePayroll(
             $run->id,
             $employee->id,
+            TelemetryContext::requestId(),
+            TelemetryContext::traceId(),
         ))->all();
+
+        $this->telemetry->emit('payroll.run.queued', 'business', 'success', [
+            'company.id' => $run->company_id,
+            'payroll.run_id' => $run->id,
+            'processed_count' => count($jobs),
+        ]);
+        $this->telemetry->emit('queue.batch.started', 'business', 'success', [
+            'company.id' => $run->company_id,
+            'payroll.run_id' => $run->id,
+            'processed_count' => count($jobs),
+        ]);
 
         return Bus::batch($jobs)
             ->name("payroll-run-{$run->id}")
             ->allowFailures()
+            ->then(function (Batch $batch) use ($run) {
+                app(DomainTelemetry::class)->emit('queue.batch.completed', 'business', 'success', [
+                    'company.id' => $run->company_id,
+                    'payroll.run_id' => $run->id,
+                    'job.batch_id' => $batch->id,
+                    'processed_count' => $batch->totalJobs - $batch->failedJobs,
+                    'failed_count' => $batch->failedJobs,
+                ]);
+            })
+            ->catch(function (Batch $batch) use ($run) {
+                $telemetry = app(DomainTelemetry::class);
+                $telemetry->markBatchFailed();
+                $telemetry->emit('queue.batch.failed', 'business', 'failure', [
+                    'company.id' => $run->company_id,
+                    'payroll.run_id' => $run->id,
+                    'job.batch_id' => $batch->id,
+                    'failed_count' => $batch->failedJobs,
+                ], 'error');
+            })
             ->dispatch();
     }
 

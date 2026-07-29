@@ -30,8 +30,10 @@ class DatabaseSeeder extends Seeder
                 'password' => Hash::make('secret'),
             ],
         );
-        $payrollManager->syncRoles([UserRole::PayrollManager->value]);
+        // Demo payroll operator is B2B firm staff managing multiple client companies.
+        $payrollManager->syncRoles([UserRole::B2bStaff->value]);
 
         $this->call(PayrollDemoSeeder::class);
+        $this->call(ReportTemplateSeeder::class);
     }
 }

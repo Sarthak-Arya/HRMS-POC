@@ -3,20 +3,19 @@
 namespace App\Http\Livewire;
 
 use App\Enums\Payroll\EmployeePayrollStatus;
-use App\Enums\Payroll\PayrollAdjustmentType;
 use App\Enums\Payroll\PayrollRunStatus;
 use App\Models\AuditLog;
-use App\Models\CompensationComponent;
 use App\Models\Department;
 use App\Models\Designation;
 use App\Models\Employee;
 use App\Models\EmployeePayroll;
-use App\Models\PayrollAdjustment;
 use App\Models\PayrollRun;
+use App\Services\Payroll\PayrollAdjustmentService;
 use App\Services\Payroll\PayrollGenerationService;
 use App\Services\Payroll\PayrollReadinessService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -44,18 +43,6 @@ class PayrollRunDetail extends Component
 
     public string $batchStatus = '';
 
-    public bool $showAdjustmentModal = false;
-
-    public string $adjustmentEmployeeId = '';
-
-    public string $adjustmentType = 'ADDITION';
-
-    public string $adjustmentAmount = '';
-
-    public string $adjustmentRemarks = '';
-
-    public string $adjustmentComponentId = '';
-
     public function mount(?string $company_id = null, ?int $run_id = null): void
     {
         $this->companyId = $company_id ?? (string) session('companyId');
@@ -67,7 +54,7 @@ class PayrollRunDetail extends Component
     {
         return PayrollRun::query()
             ->where('company_id', $this->companyId)
-            ->with(['company', 'processedBy'])
+            ->with(['company.locations', 'processedBy'])
             ->findOrFail($this->runId);
     }
 
@@ -87,6 +74,23 @@ class PayrollRunDetail extends Component
                 $this->selectedDepartment ? (int) $this->selectedDepartment : null,
                 $this->selectedDesignation ? (int) $this->selectedDesignation : null,
             );
+
+            // #region agent log
+            file_put_contents(base_path('debug-3bd8a4.log'), json_encode([
+                'sessionId' => '3bd8a4',
+                'runId' => 'pre-fix',
+                'hypothesisId' => 'E',
+                'location' => 'PayrollRunDetail.php:processPayroll',
+                'message' => 'calculate payroll dispatched',
+                'data' => [
+                    'run_id' => $run->id,
+                    'company_id' => $this->companyId,
+                    'batch_id' => $batch->id,
+                    'total_jobs' => $batch->totalJobs,
+                ],
+                'timestamp' => (int) round(microtime(true) * 1000),
+            ]).PHP_EOL, FILE_APPEND);
+            // #endregion
 
             $this->batchId = $batch->id;
             $this->batchStatus = 'processing';
@@ -163,53 +167,43 @@ class PayrollRunDetail extends Component
     {
         $this->activeTab = $tab;
         $this->resetPage();
+
+        if ($tab === 'adjustments') {
+            $this->dispatchBrowserEvent('payroll-adjustments-tab-shown');
+        }
     }
 
-    public function openAdjustmentModal(?int $employeeId = null): void
+    public function saveAdjustmentMatrix(array $changes, PayrollAdjustmentService $adjustmentService): void
     {
-        $this->showAdjustmentModal = true;
-        $this->adjustmentEmployeeId = $employeeId ? (string) $employeeId : '';
-        $this->adjustmentType = PayrollAdjustmentType::ADDITION->value;
-        $this->adjustmentAmount = '';
-        $this->adjustmentRemarks = '';
-        $this->adjustmentComponentId = '';
-    }
-
-    public function closeAdjustmentModal(): void
-    {
-        $this->showAdjustmentModal = false;
-    }
-
-    public function saveAdjustment(): void
-    {
-        $this->validate([
-            'adjustmentEmployeeId' => 'required|exists:employees,id',
-            'adjustmentType' => 'required|in:ADDITION,DEDUCTION',
-            'adjustmentAmount' => 'required|numeric|min:0.01',
-            'adjustmentRemarks' => 'nullable|string|max:500',
-            'adjustmentComponentId' => 'nullable|exists:compensation_components,id',
-        ]);
-
         $run = $this->run;
 
         if ($run->isLocked()) {
-            session()->flash('error', 'Cannot add adjustments to a locked run.');
+            session()->flash('error', 'Cannot edit adjustments on a locked run.');
 
             return;
         }
 
-        PayrollAdjustment::create([
-            'employee_id' => (int) $this->adjustmentEmployeeId,
-            'payroll_run_id' => $run->id,
-            'component_id' => $this->adjustmentComponentId ?: null,
-            'adjustment_type' => $this->adjustmentType,
-            'amount' => $this->adjustmentAmount,
-            'remarks' => $this->adjustmentRemarks,
-            'created_by' => auth()->id(),
-        ]);
+        try {
+            $result = $adjustmentService->syncMatrix($run, $changes);
+            $matrix = $adjustmentService->buildMatrix(
+                $run,
+                $this->selectedDepartment ? (int) $this->selectedDepartment : null,
+                $this->selectedDesignation ? (int) $this->selectedDesignation : null,
+            );
 
-        $this->closeAdjustmentModal();
-        session()->flash('success', 'Adjustment saved. Reprocess payroll to apply changes.');
+            $this->dispatchBrowserEvent('adjustment-matrix-saved', [
+                'matrix' => $matrix,
+                'message' => "Saved {$result['saved']} adjustment(s)".($result['deleted'] > 0 ? ", removed {$result['deleted']}" : '').'. Reprocess payroll to apply changes.',
+            ]);
+            session()->flash('success', "Saved {$result['saved']} adjustment(s)".($result['deleted'] > 0 ? ", removed {$result['deleted']}" : '').'. Reprocess payroll to apply changes.');
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $field => $messages) {
+                $this->addError($field, $messages[0]);
+            }
+            $this->dispatchBrowserEvent('adjustment-matrix-error', [
+                'message' => collect($e->errors())->flatten()->first() ?? 'Could not save adjustments.',
+            ]);
+        }
     }
 
     public function viewEmployeePayroll(int $employeePayrollId): void
@@ -258,7 +252,11 @@ class PayrollRunDetail extends Component
             'net' => $run->employeePayrolls()->sum('net_pay'),
         ];
 
-        $adjustments = $run->adjustments()->with(['employee', 'component', 'createdBy'])->latest()->get();
+        $adjustmentMatrix = app(PayrollAdjustmentService::class)->buildMatrix(
+            $run,
+            $this->selectedDepartment ? (int) $this->selectedDepartment : null,
+            $this->selectedDesignation ? (int) $this->selectedDesignation : null,
+        );
         $history = $run->history()->with('changedBy')->limit(20)->get();
 
         $employeePayrollIds = $run->employeePayrolls()->pluck('id');
@@ -286,15 +284,21 @@ class PayrollRunDetail extends Component
             'employeePayrolls' => $employeePayrolls,
             'readiness' => $readiness,
             'summary' => $summary,
-            'adjustments' => $adjustments,
+            'adjustmentMatrix' => $adjustmentMatrix,
             'history' => $history,
             'auditLogs' => $auditLogs,
             'departments' => Department::where('company_id', $companyId)->get(),
             'designations' => Designation::where('company_id', $companyId)->get(),
             'employees' => Employee::where('company_id', $companyId)->orderBy('employee_name')->get(),
-            'components' => CompensationComponent::where('company_id', $companyId)->where('is_active', true)->get(),
+            'adjustmentComponents' => app(PayrollAdjustmentService::class)->listAdjustmentComponents($companyId),
+            'payrollEmployees' => Employee::query()
+                ->where('company_id', $companyId)
+                ->whereIn('id', $run->employeePayrolls()->pluck('employee_id'))
+                ->orderBy('employee_name')
+                ->get(),
             'periodLabel' => Carbon::create($run->year, $run->month)->format('F Y'),
             'statusBadge' => $this->statusBadgeClass($run->status),
+            'companySubtitle' => $this->companySubtitle($run),
         ]);
     }
 
@@ -306,5 +310,20 @@ class PayrollRunDetail extends Component
             PayrollRunStatus::COMPLETED => 'success',
             PayrollRunStatus::LOCKED => 'dark',
         };
+    }
+
+    private function companySubtitle(PayrollRun $run): string
+    {
+        $company = $run->company;
+        $parts = array_filter([$company?->company_name]);
+
+        $location = $company?->locations?->first();
+        if ($location) {
+            $parts[] = $location->location_name;
+        } elseif ($company?->state) {
+            $parts[] = $company->state;
+        }
+
+        return implode(' | ', $parts) ?: 'Company';
     }
 }

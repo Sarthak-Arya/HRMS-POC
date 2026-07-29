@@ -96,11 +96,6 @@
                         @if($isEditMode)
                             <button type="button" class="btn btn-success" wire:click="save">Save Attendance</button>
                             <button type="button" class="btn btn-secondary" wire:click="toggleEditMode">Cancel</button>
-                            <div class="d-inline-flex align-items-center ms-3">
-                                <span class="me-2 text-sm">DED fields:</span>
-                                <button type="button" class="btn btn-sm btn-outline-dark me-1" wire:click="removeDeductionColumn">-</button>
-                                <button type="button" class="btn btn-sm btn-outline-dark" wire:click="addDeductionColumn">+</button>
-                            </div>
                         @endif
                         @if(session()->has('message'))
                             <div class="alert alert-success mt-2">{{ session('message') }}</div>
@@ -117,9 +112,6 @@
                             <th>ESI_LEAVE</th>
                             <th>HOLIDAY</th>
                             <th>TOT_DYS</th>
-                            @for ($i = 1; $i <= $deductionCount; $i++)
-                                <th>DED_{{ $i }}</th>
-                            @endfor
                         </tr>
                     </thead>
                     <tbody>
@@ -140,13 +132,6 @@
                             <td><input type="number" step="0.5" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.esi_leave" @if(!$isEditMode) readonly @endif></td>
                             <td><input type="number" step="0.5" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.holiday" @if(!$isEditMode) readonly @endif></td>
                             <td><input type="number" step="0.5" class="form-control form-control-sm" wire:model="attendanceData.{{ $employee->id }}.tot_dys" @if(!$isEditMode) readonly @endif></td>
-                            @for ($i = 0; $i < $deductionCount; $i++)
-                                <td>
-                                    <input type="number" step="0.01" class="form-control form-control-sm"
-                                        wire:model="attendanceData.{{ $employee->id }}.deductions.{{ $i }}"
-                                        @if(!$isEditMode) readonly @endif>
-                                </td>
-                            @endfor
                         </tr>
                         @endforeach
                     </tbody>

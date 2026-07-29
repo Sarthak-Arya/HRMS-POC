@@ -1,0 +1,64 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Listen for Xdebug",
+            "type": "php",
+            "request": "launch",
+            "port": 9003,
+            "pathMappings": {
+                "C:\\Java\\Payroll Software\\Payroll POC\\soft-ui-dashboard-laravel-livewire-master": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Launch Laravel (artisan serve)",
+            "type": "php",
+            "request": "launch",
+            "program": "${workspaceFolder}/artisan",
+            "cwd": "${workspaceFolder}",
+            "runtimeArgs": [
+                "serve",
+                "--host=127.0.0.1",
+                "--port=8000"
+            ],
+            "env": {
+                "XDEBUG_MODE": "debug,develop",
+                "XDEBUG_TRIGGER": "1"
+            },
+            "port": 9003
+        },
+        {
+            "name": "PHPUnit: current file",
+            "type": "php",
+            "request": "launch",
+            "program": "${workspaceFolder}/vendor/bin/phpunit",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "--configuration",
+                "${workspaceFolder}/phpunit.xml",
+                "${file}"
+            ],
+            "env": {
+                "XDEBUG_MODE": "debug,develop",
+                "XDEBUG_TRIGGER": "1"
+            },
+            "port": 9003
+        },
+        {
+            "name": "PHPUnit: all tests",
+            "type": "php",
+            "request": "launch",
+            "program": "${workspaceFolder}/vendor/bin/phpunit",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "--configuration",
+                "${workspaceFolder}/phpunit.xml"
+            ],
+            "env": {
+                "XDEBUG_MODE": "debug,develop",
+                "XDEBUG_TRIGGER": "1"
+            },
+            "port": 9003
+        }
+    ]
+}

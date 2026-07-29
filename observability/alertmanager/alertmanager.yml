@@ -1,0 +1,43 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: default
+  group_by: ["alertname", "severity", "owner"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity=~"sev1|sev2"
+      receiver: oncall
+      continue: true
+    - matchers:
+        - severity="sev3"
+      receiver: warning
+
+receivers:
+  - name: default
+    webhook_configs:
+      - url: "http://127.0.0.1:9/noop"
+        send_resolved: false
+
+  - name: oncall
+    email_configs:
+      - to: "${ALERT_EMAIL_TO:-oncall@example.com}"
+        from: "alertmanager@payroll.local"
+        smarthost: "${ALERT_SMTP_HOST:-localhost:25}"
+        require_tls: false
+        send_resolved: true
+
+  - name: warning
+    webhook_configs:
+      - url: "${ALERT_WEBHOOK_URL:-http://127.0.0.1:9/noop}"
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers:
+      - severity="sev1"
+    target_matchers:
+      - severity="sev2"
+    equal: ["alertname"]

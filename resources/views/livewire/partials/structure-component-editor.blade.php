@@ -11,7 +11,7 @@
 
 <div class="row">
     <div class="{{ $showPreview ? 'col-md-8' : 'col-12' }}">
-        <h6 class="mt-2">Components</h6>
+        <h6 class="ui-section-label">Components</h6>
         @foreach($rows as $index => $row)
             <div class="row align-items-end mb-2" wire:key="{{ $wireKeyPrefix }}-{{ $index }}">
                 <div class="col-md-4">
@@ -41,40 +41,38 @@
                     </div>
                 </div>
                 <div class="col-md-2">
-                    <button type="button" class="btn btn-sm btn-outline-danger" wire:click="{{ $removeRowMethod }}({{ $index }})">Remove</button>
+                    <button type="button" class="ui-btn-secondary ui-btn-secondary--sm ui-link-btn--danger" wire:click="{{ $removeRowMethod }}({{ $index }})">Remove</button>
                 </div>
             </div>
         @endforeach
-        <button type="button" class="btn btn-sm btn-outline-dark" wire:click="{{ $addRowMethod }}">Add Row</button>
+        <button type="button" class="ui-btn-secondary ui-btn-secondary--sm" wire:click="{{ $addRowMethod }}">Add Row</button>
         @error($errorField) <div class="text-danger text-sm">{{ $message }}</div> @enderror
     </div>
     @if($showPreview)
         <div class="col-md-4">
-            <div class="card bg-light">
-                <div class="card-body">
-                    <h6>Preview</h6>
-                    <div class="mb-3">
-                        <label class="form-label text-sm">Annual CTC</label>
-                        <input type="number" wire:model="{{ $previewCtcProperty }}" class="form-control form-control-sm">
-                    </div>
-                    @if($preview && $preview->isNotEmpty())
-                        <table class="table table-sm mb-0">
-                            @foreach($preview as $line)
-                                <tr>
-                                    <td>{{ $line['name'] }}</td>
-                                    <td class="text-end {{ ($line['type'] ?? '') === 'DEDUCTION' ? 'text-danger' : '' }}">
-                                        {{ ($line['type'] ?? '') === 'DEDUCTION' ? '-' : '' }}{{ number_format($line['amount'], 2) }}
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </table>
-                        @if(!empty($previewSummary))
-                            @include('livewire.partials.structure-preview-summary', ['summary' => $previewSummary])
-                        @endif
-                    @else
-                        <p class="text-muted text-sm mb-0">Add components to see preview.</p>
-                    @endif
+            <div class="ui-preview-panel">
+                <h6 class="ui-section-label">Preview</h6>
+                <div class="mb-3">
+                    <label class="form-label text-sm">Annual CTC</label>
+                    <input type="number" wire:model="{{ $previewCtcProperty }}" class="form-control form-control-sm">
                 </div>
+                @if($preview && $preview->isNotEmpty())
+                    <table class="ui-data-table">
+                        @foreach($preview as $line)
+                            <tr>
+                                <td>{{ $line['name'] }}</td>
+                                <td class="text-end {{ ($line['type'] ?? '') === 'DEDUCTION' ? 'text-danger' : '' }}">
+                                    {{ ($line['type'] ?? '') === 'DEDUCTION' ? '-' : '' }}{{ number_format($line['amount'], 2) }}
+                                </td>
+                            </tr>
+                        @endforeach
+                    </table>
+                    @if(!empty($previewSummary))
+                        @include('livewire.partials.structure-preview-summary', ['summary' => $previewSummary])
+                    @endif
+                @else
+                    <p class="text-muted text-sm mb-0">Add components to see preview.</p>
+                @endif
             </div>
         </div>
     @endif

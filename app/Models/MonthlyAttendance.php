@@ -2,72 +2,33 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-
-class MonthlyAttendance extends Model
+/**
+ * Backward-compatible alias for {@see EmployeeAttendanceSummary}.
+ *
+ * @property float $casual_leave
+ * @property float $earned_leave
+ * @property float $sick_leave
+ * @property float $holiday
+ */
+class MonthlyAttendance extends EmployeeAttendanceSummary
 {
-    use HasFactory;
-
-    protected $table = 'attendance';
-
-    protected $fillable = [
-        'employee_id',
-        'company_id',
-        'month',
-        'year',
-        'casual_leave',
-        'earned_leave',
-        'sick_leave',
-        'holiday',
-        'worked_days',
-        'overtime_days',
-        'overtime_hours',
-        'esi_la',
-        'total_days',
-        'prev_leave_days',
-        'prev_leave_amount',
-        'shift_code',
-        'ded_1',
-        'ded_2',
-        'ded_3',
-        'deductions',
-    ];
-
-    protected $casts = [
-        'month' => 'integer',
-        'year' => 'integer',
-        'casual_leave' => 'decimal:2',
-        'earned_leave' => 'decimal:2',
-        'sick_leave' => 'decimal:2',
-        'holiday' => 'decimal:2',
-        'worked_days' => 'decimal:2',
-        'overtime_days' => 'decimal:2',
-        'overtime_hours' => 'decimal:2',
-        'esi_la' => 'decimal:2',
-        'total_days' => 'decimal:2',
-        'prev_leave_days' => 'decimal:2',
-        'prev_leave_amount' => 'decimal:2',
-        'ded_1' => 'decimal:2',
-        'ded_2' => 'decimal:2',
-        'ded_3' => 'decimal:2',
-        'deductions' => 'array',
-    ];
-
-    public function employee(): BelongsTo
+    public function getCasualLeaveAttribute(): float
     {
-        return $this->belongsTo(Employee::class);
+        return $this->leaveDaysForCode('CL');
     }
 
-    public function company(): BelongsTo
+    public function getEarnedLeaveAttribute(): float
     {
-        return $this->belongsTo(Company::class);
+        return $this->leaveDaysForCode('EL');
     }
 
-    public function employeePayrolls(): HasMany
+    public function getSickLeaveAttribute(): float
     {
-        return $this->hasMany(EmployeePayroll::class, 'attendance_summary_id');
+        return $this->leaveDaysForCode('SL');
+    }
+
+    public function getHolidayAttribute(): float
+    {
+        return (float) $this->holiday_days;
     }
 }

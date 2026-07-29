@@ -1,0 +1,36 @@
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/payroll/*.log
+      - /var/log/payroll/*/*.log
+    json.keys_under_root: true
+    json.add_error_key: true
+    json.overwrite_keys: true
+    fields:
+      service.name: payroll-app
+    fields_under_root: true
+    processors:
+      - drop_fields:
+          fields: ["password", "email", "token", "authorization", "cookie"]
+          ignore_missing: true
+
+processors:
+  - add_host_metadata: ~
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  indices:
+    - index: "payroll-security-%{+yyyy.MM.dd}"
+      when.equals:
+        event.category: "security"
+    - index: "payroll-logs-%{+yyyy.MM.dd}"
+
+setup.ilm.enabled: true
+setup.template.enabled: true
+setup.template.name: "payroll-logs"
+setup.template.pattern: "payroll-logs-*"
+
+logging.level: info

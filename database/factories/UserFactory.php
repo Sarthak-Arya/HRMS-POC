@@ -3,6 +3,8 @@
 namespace Database\Factories;
 
 use App\Enums\UserRole;
+use App\Models\B2bFirm;
+use App\Models\Company;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -73,11 +75,51 @@ class UserFactory extends Factory
         return $this->withRole(UserRole::Viewer);
     }
 
+    public function b2bAdmin(): static
+    {
+        return $this->withRole(UserRole::B2bAdmin);
+    }
+
+    public function b2bStaff(): static
+    {
+        return $this->withRole(UserRole::B2bStaff);
+    }
+
     public function withRole(UserRole $role): static
     {
         return $this->afterCreating(function (User $user) use ($role) {
             Role::findOrCreate($role->value, 'web');
             $user->syncRoles([$role->value]);
+        });
+    }
+
+    /**
+     * Scope this user as B2B under the given firm (creating one when omitted).
+     */
+    public function forB2bFirm(B2bFirm|int|null $firm = null): static
+    {
+        return $this->state(function () use ($firm) {
+            $firmId = $firm instanceof B2bFirm
+                ? $firm->id
+                : ($firm ?? B2bFirm::factory()->create()->id);
+
+            return [
+                'b2b_firm_id' => $firmId,
+                'company_id' => null,
+            ];
+        });
+    }
+
+    /**
+     * Scope this user as B2C for the given company.
+     */
+    public function forCompany(Company|int $company): static
+    {
+        return $this->state(function () use ($company) {
+            return [
+                'company_id' => $company instanceof Company ? $company->id : $company,
+                'b2b_firm_id' => null,
+            ];
         });
     }
 

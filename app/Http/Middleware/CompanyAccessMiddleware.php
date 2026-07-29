@@ -2,11 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Observability\DomainTelemetry;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Company;
-use Illuminate\Support\Facades\Log;
 
 class CompanyAccessMiddleware
 {
@@ -23,18 +23,20 @@ class CompanyAccessMiddleware
         if (!$company) {
             abort(404, 'Company not found.');
         } else {
-            // Set company ID in session
             session(key: ['company_id' => $companyId]);
         }
 
-
-        // Check if the authenticated user is allowed to access this company
         $user = Auth::user();
         if (!$user) {
             return redirect()->route('login')->with('error', 'Please log in to access this page.');
         }
 
         if (!$user->canAccessCompany($company)) {
+            app(DomainTelemetry::class)->securityDenied('access.company.denied', [
+                'company.id' => (int) $companyId,
+                'route.template' => '/'.ltrim((string) optional($request->route())->uri(), '/'),
+                'policy' => 'canAccessCompany',
+            ]);
             abort(403, 'You do not have permission to access this company.');
         }
 

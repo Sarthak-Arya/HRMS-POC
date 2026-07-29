@@ -7,9 +7,9 @@
 
 <div class="row">
     <div class="col-md-8">
-        <h6 class="mt-2">Components</h6>
-        <div class="table-responsive">
-            <table class="table table-sm align-items-center mb-0">
+        <h6 class="ui-section-label">Components</h6>
+        <div class="ui-data-table-wrap">
+            <table class="ui-data-table">
                 <thead>
                     <tr>
                         <th>Component</th>
@@ -24,7 +24,7 @@
                         <tr>
                             <td>{{ $line['name'] }}</td>
                             <td>
-                                <span class="badge bg-gradient-{{ $line['type'] === 'EARNING' ? 'success' : 'danger' }}">{{ $line['type'] }}</span>
+                                <span class="ui-badge ui-badge--{{ $line['type'] === 'EARNING' ? 'success' : 'danger' }}">{{ $line['type'] }}</span>
                             </td>
                             <td class="text-sm text-muted">{{ $line['calculation'] }}</td>
                             <td class="text-end text-sm">{{ $line['config_value'] }}</td>
@@ -42,33 +42,31 @@
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card bg-light">
-            <div class="card-body">
-                <h6>Monthly Breakdown</h6>
-                <div class="mb-3">
-                    <label class="form-label text-sm">Annual CTC</label>
-                    <input type="number" wire:model="{{ $previewCtcProperty }}" class="form-control form-control-sm">
-                </div>
-                @if($summary && $summary['lines']->isNotEmpty())
-                    <table class="table table-sm mb-0">
-                        @foreach($summary['lines']->where('type', 'EARNING') as $line)
-                            <tr>
-                                <td class="text-sm">{{ $line['name'] }}</td>
-                                <td class="text-end text-sm text-success">+ {{ number_format($line['amount'], 2) }}</td>
-                            </tr>
-                        @endforeach
-                        @foreach($summary['lines']->where('type', 'DEDUCTION') as $line)
-                            <tr>
-                                <td class="text-sm">{{ $line['name'] }}</td>
-                                <td class="text-end text-sm text-danger">- {{ number_format($line['amount'], 2) }}</td>
-                            </tr>
-                        @endforeach
-                    </table>
-                    @include('livewire.partials.structure-preview-summary', ['summary' => $summary])
-                @else
-                    <p class="text-muted text-sm mb-0">No components to preview.</p>
-                @endif
+        <div class="ui-preview-panel">
+            <h6 class="ui-section-label">Monthly Breakdown</h6>
+            <div class="mb-3">
+                <label class="form-label text-sm">Annual CTC</label>
+                <input type="number" wire:model="{{ $previewCtcProperty }}" class="form-control form-control-sm">
             </div>
+            @if($summary && $summary['lines']->isNotEmpty())
+                <table class="ui-data-table">
+                    @foreach($summary['lines']->where('type', 'EARNING') as $line)
+                        <tr>
+                            <td class="text-sm">{{ $line['name'] }}</td>
+                            <td class="text-end text-sm text-success">+ {{ number_format($line['amount'], 2) }}</td>
+                        </tr>
+                    @endforeach
+                    @foreach($summary['lines']->where('type', 'DEDUCTION') as $line)
+                        <tr>
+                            <td class="text-sm">{{ $line['name'] }}</td>
+                            <td class="text-end text-sm text-danger">- {{ number_format($line['amount'], 2) }}</td>
+                        </tr>
+                    @endforeach
+                </table>
+                @include('livewire.partials.structure-preview-summary', ['summary' => $summary])
+            @else
+                <p class="text-muted text-sm mb-0">No components to preview.</p>
+            @endif
         </div>
     </div>
 </div>

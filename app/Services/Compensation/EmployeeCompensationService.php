@@ -30,20 +30,28 @@ class EmployeeCompensationService
      */
     public function assignRevision(int $companyId, int $employeeId, array $data): EmployeeCompensationHistory
     {
-        Employee::where('company_id', $companyId)->findOrFail($employeeId);
+        $employee = Employee::where('company_id', $companyId)->findOrFail($employeeId);
 
         $validated = Validator::make($data, [
             'structure_id' => 'required|exists:compensation_structures,id',
-            'annual_ctc' => 'required|numeric|min:0',
-            'monthly_gross' => 'nullable|numeric|min:0',
             'effective_from' => 'required|date',
             'revision_reason' => 'nullable|string|max:255',
         ])->validate();
 
-        $monthlyGross = $validated['monthly_gross'] ?? round($validated['annual_ctc'] / 12, 2);
         $effectiveFrom = Carbon::parse($validated['effective_from']);
+        $resolved = app(CompensationResolver::class)->resolveForEmployee(
+            $employee,
+            $effectiveFrom,
+            (int) $validated['structure_id'],
+        );
 
-        return DB::transaction(function () use ($companyId, $employeeId, $validated, $monthlyGross, $effectiveFrom) {
+        if ($resolved->lines->isEmpty()) {
+            throw ValidationException::withMessages([
+                'structure_id' => 'The selected structure has no active components to calculate compensation.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($companyId, $employeeId, $validated, $resolved, $effectiveFrom) {
             EmployeeCompensationHistory::where('employee_id', $employeeId)
                 ->whereNull('effective_to')
                 ->where('effective_from', '<', $effectiveFrom)
@@ -53,8 +61,8 @@ class EmployeeCompensationService
                 'company_id' => $companyId,
                 'employee_id' => $employeeId,
                 'structure_id' => $validated['structure_id'],
-                'annual_ctc' => $validated['annual_ctc'],
-                'monthly_gross' => $monthlyGross,
+                'annual_ctc' => $resolved->annualCtc ?? 0,
+                'monthly_gross' => $resolved->monthlyGross ?? 0,
                 'effective_from' => $validated['effective_from'],
                 'effective_to' => null,
                 'revision_reason' => $validated['revision_reason'] ?? null,
@@ -63,10 +71,67 @@ class EmployeeCompensationService
         });
     }
 
-    public function resolvePreview(int $companyId, int $employeeId): ResolvedCompensation
+    public function resolvePreview(int $companyId, int $employeeId, ?int $structureId = null): ResolvedCompensation
     {
         $employee = Employee::where('company_id', $companyId)->findOrFail($employeeId);
 
-        return app(CompensationResolver::class)->resolveForEmployee($employee);
+        return app(CompensationResolver::class)->resolveForEmployee(
+            $employee,
+            null,
+            $structureId,
+        );
+    }
+
+    public function resolveOrProvisionForPayroll(
+        Employee $employee,
+        Carbon $asOf,
+        ResolvedCompensation $resolved,
+    ): EmployeeCompensationHistory {
+        $history = EmployeeCompensationHistory::query()
+            ->where('employee_id', $employee->id)
+            ->where('effective_from', '<=', $asOf)
+            ->where(function ($query) use ($asOf) {
+                $query->whereNull('effective_to')->orWhere('effective_to', '>=', $asOf);
+            })
+            ->orderByDesc('effective_from')
+            ->first();
+
+        if ($history && (int) $history->structure_id === (int) $resolved->structureId) {
+            return $history;
+        }
+
+        if ($resolved->structureId === null || $resolved->lines->isEmpty()) {
+            throw ValidationException::withMessages([
+                'compensation' => 'Employee has no active compensation for this payroll period.',
+            ]);
+        }
+
+        $effectiveFrom = $asOf->copy()->startOfMonth();
+        if ($employee->doj && $employee->doj->gt($effectiveFrom)) {
+            $effectiveFrom = $employee->doj->copy();
+        }
+
+        return DB::transaction(function () use ($employee, $history, $resolved, $effectiveFrom) {
+            if ($history) {
+                $closeOn = $effectiveFrom->copy()->subDay();
+                if ($closeOn->gte(Carbon::parse($history->effective_from))) {
+                    $history->update(['effective_to' => $closeOn->toDateString()]);
+                }
+            }
+
+            return EmployeeCompensationHistory::create([
+                'company_id' => $employee->company_id,
+                'employee_id' => $employee->id,
+                'structure_id' => $resolved->structureId,
+                'annual_ctc' => $resolved->annualCtc ?? 0,
+                'monthly_gross' => $resolved->monthlyGross ?? 0,
+                'effective_from' => $effectiveFrom->toDateString(),
+                'effective_to' => null,
+                'revision_reason' => $history
+                    ? 'Aligned to '.$resolved->structureSource.' during payroll'
+                    : 'Auto-provisioned from '.$resolved->structureSource.' during payroll',
+                'approved_by' => Auth::id(),
+            ]);
+        });
     }
 }

@@ -24,21 +24,42 @@ class UserRoleService
     }
 
     /**
+     * Ensure every self-registerable role exists in the database (find-or-create).
+     * Signup depends on Spatie Role rows; an unseeded DB would otherwise show an empty dropdown.
+     */
+    public static function ensureSelfRegisterableRolesExist(): void
+    {
+        foreach (UserRole::selfRegisterable() as $role) {
+            Role::findOrCreate($role->value, 'web');
+        }
+    }
+
+    /**
      * @return list<Role>
      */
     public static function selfRegisterableRoles(): array
     {
+        self::ensureSelfRegisterableRolesExist();
+
         $names = array_map(
             fn (UserRole $role) => $role->value,
             UserRole::selfRegisterable(),
         );
 
-        return Role::query()
+        $rolesByName = Role::query()
             ->where('guard_name', 'web')
             ->whereIn('name', $names)
-            ->orderByRaw('FIELD(name, ' . implode(',', array_fill(0, count($names), '?')) . ')', $names)
             ->get()
-            ->all();
+            ->keyBy('name');
+
+        $ordered = [];
+        foreach ($names as $name) {
+            if ($rolesByName->has($name)) {
+                $ordered[] = $rolesByName->get($name);
+            }
+        }
+
+        return $ordered;
     }
 
     public static function ensureDefaultRole(User $user): User

@@ -23,7 +23,7 @@ class AiAssistantWidgetTest extends TestCase
         parent::setUp();
 
         $this->user = User::factory()->create();
-        $this->company = Company::factory()->create(['company_handled_by' => $this->user->id]);
+        $this->company = Company::factory()->ownedBy($this->user)->create();
     }
 
     public function test_it_lists_saved_conversations_for_the_current_user_and_company(): void

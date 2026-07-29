@@ -42,7 +42,7 @@ class PayrollHeader extends Model
         return $this->hasMany(Deduction::class, 'payroll_id');
     }
 
-    public function payrollEarnings(): HasMany
+    public function payrolxlEarnings(): HasMany
     {
         return $this->hasMany(PayrollEarning::class, 'payroll_id');
     }

@@ -15,6 +15,7 @@ use App\Services\Ai\ExcelPreviewService;
 use App\Services\Ai\OpenRouterClient;
 use App\Services\Ai\ToolRegistry;
 use App\Services\Ai\Tools\AttendanceToolProvider;
+use App\Services\Attendance\AttendanceSetupService;
 use App\Services\Attendance\AttendanceService;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -41,12 +42,11 @@ class AiAttendanceAgentTest extends TestCase
         $this->user = User::factory()->hrManager()->create();
         $this->actingAs($this->user);
 
-        $this->company = Company::create([
+        $this->company = Company::factory()->ownedBy($this->user)->create([
             'company_name' => 'Test Co',
             'company_address' => '123 Test St',
             'is_esi' => false,
             'is_pf' => false,
-            'company_handled_by' => $this->user->id,
         ]);
 
         $department = Department::create([
@@ -82,6 +82,8 @@ class AiAttendanceAgentTest extends TestCase
             'designation_id' => $designation->id,
             'location_id' => $location->id,
         ]);
+
+        app(AttendanceSetupService::class)->seedCompanyDefaults($this->company->id);
     }
 
     public function test_upsert_attendance_creates_record(): void
@@ -100,32 +102,40 @@ class AiAttendanceAgentTest extends TestCase
 
         $this->assertTrue($result['success']);
         $this->assertSame('created', $result['action']);
-        $this->assertDatabaseHas('attendance', [
+        $this->assertDatabaseHas('employee_attendance_summaries', [
             'employee_id' => $this->employee->id,
             'company_id' => $this->company->id,
             'month' => 6,
             'year' => 2026,
-            'casual_leave' => 1,
             'total_days' => 30,
             'worked_days' => 29,
         ]);
+
+        $summary = MonthlyAttendance::query()
+            ->where('employee_id', $this->employee->id)
+            ->where('month', 6)
+            ->where('year', 2026)
+            ->first();
+
+        $this->assertSame(1.0, $summary->casual_leave);
     }
 
     public function test_upsert_attendance_updates_existing_record(): void
     {
-        MonthlyAttendance::create([
+        $summary = MonthlyAttendance::create([
             'employee_id' => $this->employee->id,
             'company_id' => $this->company->id,
             'month' => 6,
             'year' => 2026,
-            'casual_leave' => 1,
-            'earned_leave' => 0,
-            'sick_leave' => 0,
-            'holiday' => 0,
+            'entry_source' => 'manual',
+            'holiday_days' => 0,
             'esi_la' => 0,
             'total_days' => 30,
+            'working_days' => 30,
+            'present_days' => 29,
             'worked_days' => 29,
         ]);
+        $summary->syncLeaveBreakdown(['CL' => 1, 'EL' => 0, 'SL' => 0]);
 
         $tool = collect(AttendanceToolProvider::tools())->first(fn ($t) => $t->name() === 'upsert_attendance');
         $result = $tool->handle([
@@ -138,28 +148,36 @@ class AiAttendanceAgentTest extends TestCase
 
         $this->assertTrue($result['success']);
         $this->assertSame('updated', $result['action']);
-        $this->assertDatabaseHas('attendance', [
+        $this->assertDatabaseHas('employee_attendance_summaries', [
             'employee_id' => $this->employee->id,
-            'casual_leave' => 2,
             'worked_days' => 28,
         ]);
+
+        $summary = MonthlyAttendance::query()
+            ->where('employee_id', $this->employee->id)
+            ->where('month', 6)
+            ->where('year', 2026)
+            ->first();
+
+        $this->assertSame(2.0, $summary->casual_leave);
     }
 
     public function test_get_attendance_tool(): void
     {
-        MonthlyAttendance::create([
+        $summary = MonthlyAttendance::create([
             'employee_id' => $this->employee->id,
             'company_id' => $this->company->id,
             'month' => 6,
             'year' => 2026,
-            'casual_leave' => 1,
-            'earned_leave' => 0,
-            'sick_leave' => 0,
-            'holiday' => 0,
+            'entry_source' => 'manual',
+            'holiday_days' => 0,
             'esi_la' => 0,
             'total_days' => 30,
+            'working_days' => 30,
+            'present_days' => 29,
             'worked_days' => 29,
         ]);
+        $summary->syncLeaveBreakdown(['CL' => 1, 'EL' => 0, 'SL' => 0]);
 
         $tool = collect(AttendanceToolProvider::tools())->first(fn ($t) => $t->name() === 'get_attendance');
         $result = $tool->handle([
@@ -186,7 +204,7 @@ class AiAttendanceAgentTest extends TestCase
         ], $this->company->id, $viewer->id);
 
         $this->assertFalse($result['success']);
-        $this->assertDatabaseMissing('attendance', [
+        $this->assertDatabaseMissing('employee_attendance_summaries', [
             'employee_id' => $this->employee->id,
             'month' => 6,
             'year' => 2026,
@@ -234,11 +252,18 @@ class AiAttendanceAgentTest extends TestCase
         );
 
         $this->assertSame('Attendance updated for EMP001.', $result['reply']);
-        $this->assertDatabaseHas('attendance', [
+        $this->assertDatabaseHas('employee_attendance_summaries', [
             'employee_id' => $this->employee->id,
-            'casual_leave' => 1,
             'total_days' => 30,
         ]);
+
+        $summary = MonthlyAttendance::query()
+            ->where('employee_id', $this->employee->id)
+            ->where('month', 6)
+            ->where('year', 2026)
+            ->first();
+
+        $this->assertSame(1.0, $summary->casual_leave);
     }
 
     public function test_attendance_service_bulk_upsert(): void
@@ -314,11 +339,18 @@ class AiAttendanceAgentTest extends TestCase
 
         $this->assertTrue($result['success']);
         $this->assertSame(1, $result['created']);
-        $this->assertDatabaseHas('attendance', [
+        $this->assertDatabaseHas('employee_attendance_summaries', [
             'employee_id' => $this->employee->id,
-            'casual_leave' => 2,
             'total_days' => 30,
         ]);
+
+        $summary = MonthlyAttendance::query()
+            ->where('employee_id', $this->employee->id)
+            ->where('month', 6)
+            ->where('year', 2026)
+            ->first();
+
+        $this->assertSame(2.0, $summary->casual_leave);
 
         @unlink($path);
     }
@@ -395,12 +427,19 @@ class AiAttendanceAgentTest extends TestCase
         ], $this->company->id, $this->user->id);
 
         $this->assertTrue($result['success']);
-        $this->assertDatabaseHas('attendance', [
+        $this->assertDatabaseHas('employee_attendance_summaries', [
             'employee_id' => $this->employee->id,
             'month' => 6,
             'year' => 2026,
-            'casual_leave' => 3,
         ]);
+
+        $summary = MonthlyAttendance::query()
+            ->where('employee_id', $this->employee->id)
+            ->where('month', 6)
+            ->where('year', 2026)
+            ->first();
+
+        $this->assertSame(3.0, $summary->casual_leave);
 
         @unlink($path);
     }
@@ -445,12 +484,19 @@ class AiAttendanceAgentTest extends TestCase
         );
 
         $this->assertStringContainsString('attendance imported', strtolower($second['reply']));
-        $this->assertDatabaseHas('attendance', [
+        $this->assertDatabaseHas('employee_attendance_summaries', [
             'employee_id' => $this->employee->id,
             'month' => 6,
             'year' => 2026,
-            'casual_leave' => 2,
         ]);
+
+        $summary = MonthlyAttendance::query()
+            ->where('employee_id', $this->employee->id)
+            ->where('month', 6)
+            ->where('year', 2026)
+            ->first();
+
+        $this->assertSame(2.0, $summary->casual_leave);
 
         @unlink($path);
     }
@@ -471,11 +517,18 @@ class AiAttendanceAgentTest extends TestCase
 
         $this->assertTrue($result['success']);
         $this->assertSame(1, $result['created']);
-        $this->assertDatabaseHas('attendance', [
+        $this->assertDatabaseHas('employee_attendance_summaries', [
             'employee_id' => $this->employee->id,
-            'casual_leave' => 2,
             'total_days' => 30,
         ]);
+
+        $summary = MonthlyAttendance::query()
+            ->where('employee_id', $this->employee->id)
+            ->where('month', 6)
+            ->where('year', 2026)
+            ->first();
+
+        $this->assertSame(2.0, $summary->casual_leave);
 
         @unlink($path);
     }

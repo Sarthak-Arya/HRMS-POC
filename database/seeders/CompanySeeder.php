@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Enums\UserRole;
+use App\Models\B2bFirm;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,6 +14,7 @@ class CompanySeeder extends Seeder
 {
     public const DEMO_ADMIN_EMAIL = 'admin@softui.com';
     public const DEMO_PAYROLL_EMAIL = 'payroll@softui.com';
+    public const DEMO_B2B_FIRM_NAME = 'SoftUI Payroll Advisors';
 
     /**
      * @return list<array{company_name: string, company_address: string, handled_by_email: string}>
@@ -57,22 +60,43 @@ class CompanySeeder extends Seeder
 
     public function run(): void
     {
-        foreach (self::companyDefinitions() as $definition) {
-            $handlerId = User::query()
-                ->where('email', $definition['handled_by_email'])
-                ->value('id');
+        $firm = B2bFirm::firstOrCreate(
+            ['name' => self::DEMO_B2B_FIRM_NAME],
+        );
 
-            if (!$handlerId) {
+        $payrollManager = User::query()
+            ->where('email', self::DEMO_PAYROLL_EMAIL)
+            ->first();
+
+        if ($payrollManager) {
+            $payrollManager->forceFill([
+                'b2b_firm_id' => $firm->id,
+                'company_id' => null,
+            ])->save();
+
+            if (! $payrollManager->hasRole(UserRole::B2bStaff) && ! $payrollManager->hasRole(UserRole::B2bAdmin)) {
+                $payrollManager->syncRoles([UserRole::B2bStaff->value]);
+            }
+        }
+
+        foreach (self::companyDefinitions() as $definition) {
+            $handler = User::query()
+                ->where('email', $definition['handled_by_email'])
+                ->first();
+
+            if (! $handler) {
                 throw new RuntimeException(
                     "Demo user [{$definition['handled_by_email']}] not found. Seed users before companies.",
                 );
             }
 
+            $isPlatformAdmin = $definition['handled_by_email'] === self::DEMO_ADMIN_EMAIL;
+
             Company::firstOrCreate(
                 ['company_name' => $definition['company_name']],
                 [
                     'company_address' => $definition['company_address'],
-                    'company_handled_by' => $handlerId,
+                    'b2b_firm_id' => $isPlatformAdmin ? null : $firm->id,
                     'is_esi' => true,
                     'is_pf' => true,
                 ],

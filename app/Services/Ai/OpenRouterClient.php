@@ -2,9 +2,9 @@
 
 namespace App\Services\Ai;
 
+use App\Services\Observability\DomainTelemetry;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -13,6 +13,11 @@ use RuntimeException;
  */
 class OpenRouterClient
 {
+    public function __construct(
+        private readonly DomainTelemetry $telemetry,
+    ) {
+    }
+
     /**
      * Send a chat request to the OpenRouter API.
      *
@@ -41,6 +46,7 @@ class OpenRouterClient
 
         $attempts = config('ai.openrouter.retry_attempts');
         $delayMs = config('ai.openrouter.retry_delay_ms');
+        $started = microtime(true);
 
         for ($attempt = 1; $attempt <= $attempts; $attempt++) {
             try {
@@ -62,20 +68,23 @@ class OpenRouterClient
                     continue;
                 }
 
+                $duration = microtime(true) - $started;
+                $this->telemetry->recordHttpClient('openrouter', $response->status(), $duration);
+
                 if (!$response->successful()) {
-                    $body = $response->json();
-                    $message = $body['error']['message'] ?? $response->body();
+                    $this->telemetry->emit('ai.request.completed', 'integration', 'failure', [
+                        'provider' => 'openrouter',
+                        'http.status' => $response->status(),
+                        'http.status_class' => $response->status() >= 500 ? '5xx' : '4xx',
+                        'duration_ms' => (int) round($duration * 1000),
+                        'job.attempts' => $attempt,
+                    ], 'error');
 
                     if ($response->status() === 429) {
                         throw new RuntimeException('OpenRouter rate limit reached. Please try again later.');
                     }
 
-                    Log::error('OpenRouter API error', [
-                        'status' => $response->status(),
-                        'body' => $body,
-                    ]);
-
-                    throw new RuntimeException('AI service error: ' . $message);
+                    throw new RuntimeException('AI service error: request failed with status '.$response->status());
                 }
 
                 $data = $response->json();
@@ -85,9 +94,23 @@ class OpenRouterClient
                     throw new RuntimeException('Invalid response from AI service.');
                 }
 
+                $this->telemetry->emit('ai.request.completed', 'integration', 'success', [
+                    'provider' => 'openrouter',
+                    'http.status' => $response->status(),
+                    'http.status_class' => '2xx',
+                    'duration_ms' => (int) round($duration * 1000),
+                    'job.attempts' => $attempt,
+                ]);
+
                 return $choice;
             } catch (ConnectionException $e) {
+                $this->telemetry->recordHttpClient('openrouter', 0, microtime(true) - $started);
                 if ($attempt >= $attempts) {
+                    $this->telemetry->emit('ai.request.completed', 'integration', 'failure', [
+                        'provider' => 'openrouter',
+                        'error.type' => ConnectionException::class,
+                        'job.attempts' => $attempt,
+                    ], 'error');
                     throw new RuntimeException('Could not connect to AI service.', 0, $e);
                 }
                 usleep($delayMs * 1000 * $attempt);

@@ -1,0 +1,67 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Payroll batch failures",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(payroll_batch_failed_total[5m]))",
+          "legendFormat": "failures/s"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Payroll events",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum by (event_name) (rate(payroll_business_events_total{event_name=~\"payroll\\\\..*\"}[5m]))",
+          "legendFormat": "{{event_name}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Report exports",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(payroll_business_events_total{event_name=\"report.export.completed\"}[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Security denials",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum by (event_name) (rate(payroll_security_events_total{outcome=\"denied\"}[5m]))",
+          "legendFormat": "{{event_name}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "AI provider calls",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum by (status_class) (rate(payroll_http_client_requests_total{provider=\"openrouter\"}[5m]))",
+          "legendFormat": "{{status_class}}"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["payroll", "business"],
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "Payroll Business & Security",
+  "uid": "payroll-business-security",
+  "version": 1
+}

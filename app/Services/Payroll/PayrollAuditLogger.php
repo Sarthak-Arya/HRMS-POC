@@ -4,6 +4,7 @@ namespace App\Services\Payroll;
 
 use App\Enums\Payroll\AuditEventType;
 use App\Models\AuditLog;
+use App\Support\Observability\TelemetryContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
@@ -27,7 +28,7 @@ class PayrollAuditLogger
             'new_values' => $newValues,
             'changed_by' => Auth::id(),
             'changed_at' => now(),
-            'request_id' => $requestId,
+            'request_id' => $requestId ?? TelemetryContext::requestId(),
             'source' => $source ?? 'payroll_v2',
         ]);
     }

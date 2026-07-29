@@ -107,7 +107,7 @@ class EmployeePayrollDetail extends Component
             'payroll' => $payroll,
             'run' => $run,
             'earnings' => $payroll->lines->where('component_type', PayrollLineComponentType::EARNING),
-            'deductions' => $payroll->lines->where('component_type', PayrollLineComponentType::DEDUCTION),
+            'deductions' => $payroll->lines->whereIn('component_type', [PayrollLineComponentType::DEDUCTION, PayrollLineComponentType::BENEFIT]),
             'employer' => $payroll->lines->where('component_type', PayrollLineComponentType::EMPLOYER_CONTRIBUTION),
             'periodLabel' => Carbon::create($run->year, $run->month)->format('F Y'),
         ]);

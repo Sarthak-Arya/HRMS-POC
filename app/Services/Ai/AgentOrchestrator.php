@@ -6,7 +6,6 @@ use App\Models\AiConversation;
 use App\Models\AiMessage;
 use App\Models\Company;
 use App\Models\User;
-use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -535,20 +534,32 @@ PROMPT;
             $tool = $this->registry->get($toolName);
 
             if ($tool->isMutating()) {
-                Log::info('AI tool executed', [
-                    'user_id' => $userId,
-                    'company_id' => $companyId,
-                    'tool' => $toolName,
-                    'args_summary' => array_keys($args),
-                ]);
+                app(\App\Services\Observability\DomainTelemetry::class)->emit(
+                    'ai.tool.mutating_invoked',
+                    'audit',
+                    'success',
+                    [
+                        'company.id' => $companyId,
+                        'actor.user_id' => $userId,
+                        'tool_name' => $toolName,
+                    ]
+                );
             }
 
             return $tool->handle($args, $companyId, $userId);
         } catch (\Throwable $e) {
-            Log::error('AI tool failed', [
-                'tool' => $toolName,
-                'error' => $e->getMessage(),
-            ]);
+            app(\App\Services\Observability\DomainTelemetry::class)->emit(
+                'ai.tool.mutating_invoked',
+                'audit',
+                'failure',
+                [
+                    'company.id' => $companyId,
+                    'actor.user_id' => $userId,
+                    'tool_name' => $toolName,
+                    'error.type' => $e::class,
+                ],
+                'error'
+            );
 
             return [
                 'success' => false,

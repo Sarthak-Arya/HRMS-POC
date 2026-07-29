@@ -24,6 +24,34 @@ class CompensationComponentService
     }
 
     /**
+     * Salary structure components only (excludes payroll adjustment types).
+     *
+     * @return Collection<int, CompensationComponent>
+     */
+    public function listStructureComponents(int $companyId, bool $activeOnly = true): Collection
+    {
+        return CompensationComponent::where('company_id', $companyId)
+            ->where('is_payroll_adjustment', false)
+            ->when($activeOnly, fn ($q) => $q->where('is_active', true))
+            ->orderBy('display_order')
+            ->orderBy('component_name')
+            ->get();
+    }
+
+    /**
+     * @return Collection<int, CompensationComponent>
+     */
+    public function listPayrollAdjustments(int $companyId): Collection
+    {
+        return CompensationComponent::where('company_id', $companyId)
+            ->where('is_payroll_adjustment', true)
+            ->where('is_active', true)
+            ->orderBy('display_order')
+            ->orderBy('component_name')
+            ->get();
+    }
+
+    /**
      * @param array<string, mixed> $data
      */
     public function create(int $companyId, array $data): CompensationComponent
@@ -84,12 +112,20 @@ class CompensationComponentService
                     ->where('company_id', $companyId)
                     ->ignore($ignoreId),
             ],
-            'component_type' => 'required|in:EARNING,DEDUCTION',
+            'component_type' => 'required|in:EARNING,DEDUCTION,BENEFIT',
             'default_calculation_type' => 'required|in:FIXED,PERCENT_BASIC,PERCENT_CTC,FORMULA',
             'default_value' => 'nullable|numeric|min:0',
             'statutory_component' => 'nullable|in:PF,ESIC,PT,LWF,TDS',
+            'benefit_plan' => 'nullable|in:NPS,80C,80D,80DD,80DDB,80GGC,OTHER',
+            'associate_investment' => 'nullable|in:NPS,80C,80D,80DD,80DDB,80GGC,OTHER',
+            'include_employer_contribution' => 'boolean',
+            'is_superannuation' => 'boolean',
+            'pro_rata_basis' => 'boolean',
             'is_taxable' => 'boolean',
             'is_active' => 'boolean',
+            'is_payroll_adjustment' => 'boolean',
+            'included_in_pf_wages' => 'boolean',
+            'included_in_esi_wages' => 'boolean',
             'display_order' => 'integer|min:0',
         ]);
 
@@ -97,6 +133,39 @@ class CompensationComponentService
             throw new ValidationException($validator);
         }
 
-        return $validator->validated();
+        $validated = $validator->validated();
+
+        if (!empty($validated['is_payroll_adjustment'])) {
+            $validated['default_calculation_type'] = 'FIXED';
+            $validated['default_value'] = null;
+            $validated['statutory_component'] = null;
+            $validated['benefit_plan'] = null;
+            $validated['associate_investment'] = null;
+            $validated['include_employer_contribution'] = false;
+            $validated['is_superannuation'] = false;
+            $validated['pro_rata_basis'] = false;
+            $validated['included_in_pf_wages'] = false;
+            $validated['included_in_esi_wages'] = false;
+        }
+
+        if (($validated['component_type'] ?? '') !== 'EARNING') {
+            $validated['included_in_pf_wages'] = false;
+            $validated['included_in_esi_wages'] = false;
+        }
+
+        if (($validated['component_type'] ?? '') !== 'BENEFIT') {
+            $validated['benefit_plan'] = null;
+            $validated['associate_investment'] = null;
+            $validated['include_employer_contribution'] = false;
+            $validated['is_superannuation'] = false;
+            $validated['pro_rata_basis'] = false;
+        } else {
+            $validated['default_calculation_type'] = 'FIXED';
+            $validated['statutory_component'] = null;
+            $validated['included_in_pf_wages'] = false;
+            $validated['included_in_esi_wages'] = false;
+        }
+
+        return $validated;
     }
 }

@@ -22,7 +22,7 @@ class CompensationComponentTest extends TestCase
 
         $user = User::factory()->create();
         $this->actingAs($user);
-        $this->company = Company::factory()->create(['company_handled_by' => $user->id]);
+        $this->company = Company::factory()->ownedBy($user)->create();
     }
 
     public function test_it_creates_component_scoped_to_company(): void
@@ -60,5 +60,23 @@ class CompensationComponentTest extends TestCase
             'component_type' => 'EARNING',
             'default_calculation_type' => 'FIXED',
         ]);
+    }
+
+    public function test_it_creates_payroll_adjustment_component(): void
+    {
+        $component = app(CompensationComponentService::class)->create($this->company->id, [
+            'component_name' => 'Performance Bonus',
+            'component_type' => 'EARNING',
+            'default_calculation_type' => 'FIXED',
+            'is_payroll_adjustment' => true,
+            'is_taxable' => true,
+            'is_active' => true,
+            'display_order' => 10,
+        ]);
+
+        $this->assertTrue($component->is_payroll_adjustment);
+        $this->assertSame('FIXED', $component->default_calculation_type->value);
+        $this->assertNull($component->default_value);
+        $this->assertNull($component->statutory_component);
     }
 }

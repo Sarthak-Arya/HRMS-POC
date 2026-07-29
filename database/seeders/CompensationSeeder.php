@@ -17,6 +17,8 @@ use App\Models\Employee;
 use App\Models\EmployeeCompensationHistory;
 use App\Models\Location;
 use App\Models\StructureComponent;
+use App\Models\User;
+use App\Services\Compensation\CompensationResolver;
 use Illuminate\Database\Seeder;
 
 class CompensationSeeder extends Seeder
@@ -25,7 +27,9 @@ class CompensationSeeder extends Seeder
     {
         CompanySeeder::demoCompaniesQuery()
             ->each(function (Company $company) {
-                $components = $this->seedComponents($company);
+                $actorId = $this->actorIdFor($company);
+                $components = $this->seedComponents($company, $actorId);
+                $this->seedPayrollAdjustmentComponents($company, $actorId);
                 $standardStructure = $this->seedStructure($company, $components, 'Standard Grade', false, [
                     ['key' => 'basic', 'value' => 30000, 'calc' => CalculationType::FIXED, 'mandatory' => true],
                     ['key' => 'hra', 'value' => 40, 'calc' => CalculationType::PERCENT_BASIC, 'mandatory' => false],
@@ -91,16 +95,16 @@ class CompensationSeeder extends Seeder
                                 'value' => 55,
                                 'calculation_type' => CalculationType::PERCENT_BASIC,
                                 'effective_to' => null,
-                                'created_by' => $company->company_handled_by,
+                                'created_by' => $actorId,
                             ],
                         );
                     }
                 }
 
-                Employee::where('company_id', $company->id)->each(function (Employee $employee, int $index) use ($company, $standardStructure, $seniorStructure, $components) {
+                Employee::where('company_id', $company->id)->each(function (Employee $employee, int $index) use ($company, $standardStructure, $seniorStructure, $components, $actorId) {
                     $structure = $index % 3 === 0 ? $seniorStructure : $standardStructure;
-                    $monthlyGross = $this->estimateMonthlyGross($structure);
-                    $annualCtc = round($monthlyGross * 12, 2);
+                    [, $monthlyGross, $annualCtc] = app(CompensationResolver::class)
+                        ->resolveStructureAmounts($structure);
 
                     EmployeeCompensationHistory::firstOrCreate(
                         [
@@ -114,7 +118,7 @@ class CompensationSeeder extends Seeder
                             'monthly_gross' => $monthlyGross,
                             'effective_to' => null,
                             'revision_reason' => 'Initial seeded compensation',
-                            'approved_by' => $company->company_handled_by,
+                            'approved_by' => $actorId,
                         ],
                     );
 
@@ -134,7 +138,7 @@ class CompensationSeeder extends Seeder
                                 'value' => 8000,
                                 'calculation_type' => CalculationType::FIXED,
                                 'effective_to' => null,
-                                'created_by' => $company->company_handled_by,
+                                'created_by' => $actorId,
                             ],
                         );
                     }
@@ -142,23 +146,48 @@ class CompensationSeeder extends Seeder
             });
     }
 
+    private function actorIdFor(Company $company): ?int
+    {
+        if ($company->b2b_firm_id) {
+            $firmUserId = User::query()
+                ->where('b2b_firm_id', $company->b2b_firm_id)
+                ->orderBy('id')
+                ->value('id');
+
+            if ($firmUserId) {
+                return (int) $firmUserId;
+            }
+        }
+
+        $companyUserId = User::query()
+            ->where('company_id', $company->id)
+            ->orderBy('id')
+            ->value('id');
+
+        if ($companyUserId) {
+            return (int) $companyUserId;
+        }
+
+        return User::query()->orderBy('id')->value('id');
+    }
+
     /**
      * @return array<string, CompensationComponent>
      */
-    private function seedComponents(Company $company): array
+    private function seedComponents(Company $company, ?int $actorId): array
     {
         $definitions = [
-            'basic' => ['name' => 'Basic', 'type' => ComponentType::EARNING, 'calc' => CalculationType::FIXED, 'order' => 1],
-            'hra' => ['name' => 'HRA', 'type' => ComponentType::EARNING, 'calc' => CalculationType::PERCENT_BASIC, 'order' => 2],
-            'conveyance' => ['name' => 'Conveyance', 'type' => ComponentType::EARNING, 'calc' => CalculationType::FIXED, 'order' => 3],
-            'special' => ['name' => 'Special Allowance', 'type' => ComponentType::EARNING, 'calc' => CalculationType::FIXED, 'order' => 4],
+            'basic' => ['name' => 'Basic', 'type' => ComponentType::EARNING, 'calc' => CalculationType::FIXED, 'order' => 1, 'pf_wage' => true, 'esi_wage' => true],
+            'hra' => ['name' => 'HRA', 'type' => ComponentType::EARNING, 'calc' => CalculationType::PERCENT_BASIC, 'order' => 2, 'pf_wage' => false, 'esi_wage' => true],
+            'conveyance' => ['name' => 'Conveyance', 'type' => ComponentType::EARNING, 'calc' => CalculationType::FIXED, 'order' => 3, 'pf_wage' => false, 'esi_wage' => true],
+            'special' => ['name' => 'Special Allowance', 'type' => ComponentType::EARNING, 'calc' => CalculationType::FIXED, 'order' => 4, 'pf_wage' => false, 'esi_wage' => true],
             'pf' => ['name' => 'Provident Fund', 'type' => ComponentType::DEDUCTION, 'calc' => CalculationType::PERCENT_BASIC, 'order' => 5, 'statutory' => StatutoryComponent::PF],
         ];
 
         $components = [];
 
         foreach ($definitions as $key => $definition) {
-            $components[$key] = CompensationComponent::firstOrCreate(
+            $components[$key] = CompensationComponent::updateOrCreate(
                 [
                     'company_id' => $company->id,
                     'component_name' => $definition['name'],
@@ -167,15 +196,43 @@ class CompensationSeeder extends Seeder
                     'component_type' => $definition['type'],
                     'default_calculation_type' => $definition['calc'],
                     'statutory_component' => $definition['statutory'] ?? null,
+                    'included_in_pf_wages' => $definition['pf_wage'] ?? false,
+                    'included_in_esi_wages' => $definition['esi_wage'] ?? false,
                     'is_taxable' => $definition['type'] === ComponentType::EARNING,
                     'is_active' => true,
                     'display_order' => $definition['order'],
-                    'created_by' => $company->company_handled_by,
+                    'created_by' => $actorId,
                 ],
             );
         }
 
         return $components;
+    }
+
+    private function seedPayrollAdjustmentComponents(Company $company, ?int $actorId): void
+    {
+        $definitions = [
+            ['name' => 'Performance Bonus', 'type' => ComponentType::EARNING, 'order' => 101],
+            ['name' => 'Advance Recovery', 'type' => ComponentType::DEDUCTION, 'order' => 102],
+        ];
+
+        foreach ($definitions as $definition) {
+            CompensationComponent::firstOrCreate(
+                [
+                    'company_id' => $company->id,
+                    'component_name' => $definition['name'],
+                ],
+                [
+                    'component_type' => $definition['type'],
+                    'default_calculation_type' => CalculationType::FIXED,
+                    'is_taxable' => $definition['type'] === ComponentType::EARNING,
+                    'is_active' => true,
+                    'is_payroll_adjustment' => true,
+                    'display_order' => $definition['order'],
+                    'created_by' => $actorId,
+                ],
+            );
+        }
     }
 
     /**
@@ -241,42 +298,5 @@ class CompensationSeeder extends Seeder
             ],
             ['effective_to' => null],
         );
-    }
-
-    private function estimateMonthlyGross(CompensationStructure $structure): float
-    {
-        $structure->load('structureComponents.component');
-        $basic = 0.0;
-        $total = 0.0;
-
-        foreach ($structure->structureComponents as $row) {
-            if ($row->component?->component_type !== ComponentType::EARNING) {
-                continue;
-            }
-
-            $calc = $row->calculation_type ?? $row->component->default_calculation_type;
-            $value = (float) ($row->value ?? 0);
-
-            if ($calc === CalculationType::FIXED && strcasecmp($row->component->component_name, 'Basic') === 0) {
-                $basic = $value;
-            }
-        }
-
-        foreach ($structure->structureComponents as $row) {
-            if ($row->component?->component_type !== ComponentType::EARNING) {
-                continue;
-            }
-
-            $calc = $row->calculation_type ?? $row->component->default_calculation_type;
-            $value = (float) ($row->value ?? 0);
-
-            $total += match ($calc) {
-                CalculationType::PERCENT_BASIC => $basic * ($value / 100),
-                CalculationType::PERCENT_CTC => 0,
-                default => $value,
-            };
-        }
-
-        return round($total, 2);
     }
 }

@@ -5,12 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Department;
 use App\Models\Location;
+use App\Models\CompanySetting;
 
 /**
  * Model representing a company.
- * A company can have multiple departments, designations, locations, 
+ * A company can have multiple departments, designations, locations,
  * compensation components, and structures.
  */
 class Company extends Model
@@ -25,7 +27,7 @@ class Company extends Model
         'company_name', 'gst_number', 'company_address', 'zip_code', 'state', 'country',
         'esi_code', 'esi_contribution', 'esi_coverage_end_date', 'esi_coverage_start_date',
         'pf_code', 'pf_coverage_start_date', 'pf_coverage_end_date', 'pf_contribution',
-        'services_opted', 'is_esi', 'is_pf', 'company_handled_by'
+        'services_opted', 'is_esi', 'is_pf', 'b2b_firm_id',
     ];
 
     /**
@@ -33,16 +35,18 @@ class Company extends Model
      *
      * @return \Illuminate\Database\Eloquent\Relations\HasMany
      */
-    public function departments(){
+    public function departments()
+    {
         return $this->hasMany(related: Department::class);
     }
-    
+
     /**
      * Get the designations for the company.
      *
      * @return \Illuminate\Database\Eloquent\Relations\HasMany
      */
-    public function designations(){
+    public function designations()
+    {
         return $this->hasMany(related: Designation::class);
     }
 
@@ -51,7 +55,8 @@ class Company extends Model
      *
      * @return \Illuminate\Database\Eloquent\Relations\HasMany
      */
-    public function locations(){
+    public function locations()
+    {
         return $this->hasMany(Location::class);
     }
 
@@ -76,12 +81,19 @@ class Company extends Model
     }
 
     /**
-     * Get the user who handles the company.
-     *
-     * @return BelongsTo
+     * Get the B2B firm that manages this company (if any).
      */
-    public function handledBy(): BelongsTo{
-        return $this->belongsTo(User::class);
+    public function b2bFirm(): BelongsTo
+    {
+        return $this->belongsTo(B2bFirm::class, 'b2b_firm_id');
+    }
+
+    /**
+     * Direct B2C users scoped to this company.
+     */
+    public function users(): HasMany
+    {
+        return $this->hasMany(User::class, 'company_id');
     }
 
     /**
@@ -93,5 +105,9 @@ class Company extends Model
     {
         return $this->hasMany(PayrollRun::class);
     }
-}
 
+    public function companySetting()
+    {
+        return $this->hasOne(CompanySetting::class);
+    }
+}

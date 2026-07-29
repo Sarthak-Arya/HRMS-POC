@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Enums\UserRole;
+use App\Services\Observability\DomainTelemetry;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -26,6 +27,11 @@ class EnsureUserHasRole
                 return $next($request);
             }
         }
+
+        app(DomainTelemetry::class)->securityDenied('access.role.denied', [
+            'policy' => 'role:'.implode('|', $roles),
+            'route.template' => '/'.ltrim((string) optional($request->route())->uri(), '/'),
+        ]);
 
         abort(403, 'You do not have permission to access this page.');
     }

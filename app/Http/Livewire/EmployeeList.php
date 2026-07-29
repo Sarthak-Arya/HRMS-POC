@@ -7,6 +7,7 @@ use Livewire\WithPagination;
 use App\Models\Employee;
 use App\Models\Designation;
 use App\Models\Department;
+use App\Models\Company;
 use Illuminate\Support\Facades\Auth;
 
 class EmployeeList extends Component
@@ -66,6 +67,7 @@ class EmployeeList extends Component
         $designations = Designation::where('company_id', $this->companyId)->get();
         $departments = Department::where('company_id', $this->companyId)->get();
         $locations = \App\Models\Location::where('company_id', $this->companyId)->get();
+        $company = Company::find($this->companyId);
 
         return view('livewire.employee-list', [
             'employees' => $employees,
@@ -73,6 +75,7 @@ class EmployeeList extends Component
             'departments' => $departments,
             'locations' => $locations,
             'companyId' => $this->companyId,
+            'companyName' => $company?->company_name ?? 'Company',
         ]);
     }
 

@@ -1,70 +1,82 @@
 @if($isOpen)
-    <div class="ai-widget-backdrop" wire:click="toggle"></div>
+    <div class="ui-ai-widget-backdrop" wire:click="toggle" aria-hidden="true"></div>
 @endif
 
-<aside class="ai-widget-sidebar ai-assistant-root {{ $isOpen ? 'is-open' : '' }}">
+<aside class="ui-ai-widget-panel ui-page {{ $isOpen ? 'is-open' : '' }}" aria-label="AI Assistant">
     @if($isOpen && $companyId)
-        <header class="ai-widget-sidebar-header">
-            <div class="ai-widget-sidebar-brand">
-                <span class="ai-gemini-logo" aria-hidden="true">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="url(#ai-widget-star)"/>
-                        <defs>
-                            <linearGradient id="ai-widget-star" x1="2" y1="2" x2="22" y2="22">
-                                <stop stop-color="#4285F4"/>
-                                <stop offset="0.5" stop-color="#9B72CB"/>
-                                <stop offset="1" stop-color="#D96570"/>
-                            </linearGradient>
-                        </defs>
-                    </svg>
-                </span>
-                <span class="ai-widget-sidebar-title">Payroll AI</span>
+        <div class="ui-ai-shell ui-ai-shell--widget ai-assistant-root {{ empty($messages) ? 'ui-ai-shell--welcome' : 'ui-ai-shell--chat' }}">
+            <header class="ui-ai-widget-header">
+                <div class="ui-ai-widget-brand">
+                    <span class="ui-ai-widget-brand-icon" aria-hidden="true">
+                        <span class="material-symbols-outlined">auto_awesome</span>
+                    </span>
+                    <div class="ui-ai-widget-brand-text">
+                        <span class="ui-ai-widget-title">Payroll AI</span>
+                        <span class="ui-ai-widget-subtitle">Assistant</span>
+                    </div>
+                </div>
+
+                @include('livewire.partials.ai-assistant-history-dropdown')
+
+                <div class="ui-ai-widget-header-actions">
+                    <button type="button"
+                        class="ui-ai-icon-btn"
+                        wire:click.stop="newConversation"
+                        title="New chat"
+                        aria-label="New chat">
+                        <span class="material-symbols-outlined">edit_square</span>
+                    </button>
+                    <a href="{{ route('ai-assistant', ['company_id' => $companyId]) }}"
+                        class="ui-ai-icon-btn"
+                        title="Open full page"
+                        aria-label="Open full page assistant">
+                        <span class="material-symbols-outlined">open_in_full</span>
+                    </a>
+                    <button type="button"
+                        class="ui-ai-icon-btn"
+                        wire:click.stop="toggle"
+                        title="Close"
+                        aria-label="Close assistant">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            </header>
+
+            @if($statusMessage)
+                <div class="ui-ai-status ui-ai-widget-status" wire:poll.2000ms="clearStatusMessage">
+                    {{ $statusMessage }}
+                </div>
+            @endif
+
+            <div class="ui-ai-body">
+                @include('livewire.partials.ai-assistant-ui-messages', [
+                    'messagesScrollId' => 'ai-messages-scroll',
+                    'showEmptyState' => true,
+                ])
             </div>
 
-            @include('livewire.partials.ai-assistant-history-dropdown')
-
-            <div class="ai-widget-sidebar-actions">
-                <button type="button" class="ai-widget-icon-btn" wire:click.stop="newConversation" title="New chat">
-                    <i class="far fa-edit"></i>
-                </button>
-                <button type="button" class="ai-widget-icon-btn" wire:click.stop="toggle" title="Close">
-                    <i class="fas fa-times"></i>
-                </button>
+            <div class="ui-ai-composer-wrap">
+                @include('livewire.partials.ai-assistant-ui-composer', [
+                    'inputId' => 'ai-assistant-input',
+                    'voiceBtnId' => 'ai-voice-btn',
+                    'voiceIconId' => 'ai-voice-icon',
+                ])
             </div>
-        </header>
-
-        @if($statusMessage)
-            <div class="ai-gemini-status ai-widget-status" wire:poll.2000ms="clearStatusMessage">
-                {{ $statusMessage }}
-            </div>
-        @endif
-
-        <div class="ai-widget-sidebar-body">
-            @include('livewire.partials.ai-assistant-chat-messages', [
-                'messagesScrollId' => 'ai-messages-scroll',
-                'starGradientId' => 'ai-widget-star-msg',
-                'showEmptyState' => true,
-                'welcomeCompact' => true,
-            ])
         </div>
-
-        <footer class="ai-widget-sidebar-footer">
-            @include('livewire.partials.ai-assistant-chat-composer', [
-                'inputId' => 'ai-assistant-input',
-                'voiceBtnId' => 'ai-voice-btn',
-                'voiceIconId' => 'ai-voice-icon',
-                'placeholder' => 'Ask Payroll AI',
-            ])
-        </footer>
+    @elseif($isOpen && !$companyId)
+        <div class="ui-ai-widget-empty">
+            <span class="material-symbols-outlined ui-ai-empty-icon" aria-hidden="true">domain_disabled</span>
+            <p class="ui-ai-empty-text mb-0">Select a company to use Payroll AI.</p>
+        </div>
     @endif
 </aside>
 
 @if($companyId)
     <button type="button"
-        class="ai-assistant-fab {{ $isOpen ? 'is-hidden' : '' }}"
+        class="ui-ai-widget-fab {{ $isOpen ? 'is-hidden' : '' }}"
         wire:click="toggle"
         title="AI Assistant"
-        aria-label="AI Assistant">
-        <i class="fas fa-robot"></i>
+        aria-label="Open AI Assistant">
+        <span class="material-symbols-outlined">auto_awesome</span>
     </button>
 @endif

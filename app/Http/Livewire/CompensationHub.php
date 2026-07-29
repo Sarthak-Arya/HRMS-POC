@@ -3,6 +3,9 @@
 namespace App\Http\Livewire;
 
 use App\Enums\Compensation\CompensationScopeType;
+use App\Exports\CompensationStructureTemplateExport;
+use App\Imports\CompensationStructureImport;
+use App\Models\Company;
 use App\Models\CompensationStructure;
 use App\Models\Department;
 use App\Models\Employee;
@@ -11,10 +14,14 @@ use App\Services\Compensation\CompensationAssignmentService;
 use App\Services\Compensation\CompensationComponentService;
 use App\Services\Compensation\CompensationOverrideService;
 use App\Services\Compensation\CompensationResolver;
+use App\Services\Compensation\CompensationStructureImportService;
 use App\Services\Compensation\CompensationStructureService;
+use App\Services\Settings\Adapters\CompensationSettingsAdapter;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use Livewire\WithFileUploads;
+use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * Livewire component for managing compensation-related configurations.
@@ -22,11 +29,16 @@ use Livewire\Component;
  */
 class CompensationHub extends Component
 {
+    use WithFileUploads;
+
     /** @var string The ID of the current company. */
     public string $companyId = '';
 
     /** @var string The currently active tab in the UI. */
     public string $activeTab = 'components';
+
+    /** @var bool Whether this component is rendered inside Settings. */
+    public bool $embeddedInSettings = false;
 
     // Components tab
     /** @var bool Whether to show the component creation/edit modal. */
@@ -59,6 +71,30 @@ class CompensationHub extends Component
     /** @var int The display order of the component. */
     public int $componentDisplayOrder = 0;
 
+    /** @var bool Whether the component is used only for payroll adjustments. */
+    public bool $componentIsPayrollAdjustment = false;
+
+    /** @var bool Whether earnings count toward PF wage base. */
+    public bool $includedInPfWages = false;
+
+    /** @var bool Whether earnings count toward ESI wage base. */
+    public bool $includedInEsiWages = false;
+
+    /** @var string Benefit plan key for benefit components. */
+    public string $benefitPlan = '';
+
+    /** @var string Tax section / investment association key for benefit components. */
+    public string $associateInvestment = '';
+
+    /** @var bool Whether employer contribution is part of salary structure. */
+    public bool $includeEmployerContribution = false;
+
+    /** @var bool Whether this benefit is superannuation. */
+    public bool $isSuperannuation = false;
+
+    /** @var bool Whether this benefit is prorated by working days. */
+    public bool $proRataBasis = false;
+
     // Structures tab
     /** @var bool Whether to show the structure creation/edit modal. */
     public bool $showStructureModal = false;
@@ -89,6 +125,18 @@ class CompensationHub extends Component
 
     /** @var mixed Annual CTC used for previewing structure calculations. */
     public $previewAnnualCtc = 600000;
+
+    /** @var \Livewire\Features\SupportFileUploads\TemporaryUploadedFile|null Uploaded file for structures import. */
+    public $structureImportFile = null;
+
+    /** @var bool Flag to disable duplicate submits while importing. */
+    public bool $isImportingStructures = false;
+
+    /** @var string Summary shown after import. */
+    public string $structureImportMessage = '';
+
+    /** @var string Detailed error lines shown after import. */
+    public string $structureImportError = '';
 
     // Assignments tab
     /** @var string The scope type for structure assignment (e.g., company, location, department, employee). */
@@ -161,11 +209,18 @@ class CompensationHub extends Component
      * @param string|null $company_id The company ID from the route.
      * @return void
      */
-    public function mount(?string $company_id = null): void
+    public function mount(?string $company_id = null, ?string $tab = null, bool $embedded = false): void
     {
         $this->companyId = $company_id ?? (string) session()->get('companyId', '');
         if ($this->companyId !== '') {
             session()->put('companyId', $this->companyId);
+        }
+
+        $this->embeddedInSettings = $embedded;
+
+        $requestedTab = (string) ($tab ?? request()->query('tab', ''));
+        if (in_array($requestedTab, ['components', 'structures', 'assignments', 'overrides'], true)) {
+            $this->activeTab = $requestedTab;
         }
 
         $this->assignmentEffectiveFrom = now()->toDateString();
@@ -185,6 +240,13 @@ class CompensationHub extends Component
         $this->activeTab = $tab;
     }
 
+    public function canManage(): bool
+    {
+        $user = auth()->user();
+
+        return $user && $user->hasPermission('compensation.manage');
+    }
+
     // --- Components ---
 
     /**
@@ -193,10 +255,11 @@ class CompensationHub extends Component
      * @param int|null $componentId The ID of the component to edit, or null for creation.
      * @return void
      */
-    public function openComponentModal(?int $componentId = null): void
+    public function openComponentModal(?int $componentId = null, bool $forPayrollAdjustment = false): void
     {
         $this->resetComponentForm();
         $this->editingComponentId = $componentId;
+        $this->componentIsPayrollAdjustment = $forPayrollAdjustment;
 
         if ($componentId) {
             $component = app(CompensationComponentService::class)
@@ -212,6 +275,14 @@ class CompensationHub extends Component
                 $this->isTaxable = $component->is_taxable;
                 $this->componentIsActive = $component->is_active;
                 $this->componentDisplayOrder = $component->display_order;
+                $this->componentIsPayrollAdjustment = $component->is_payroll_adjustment;
+                $this->includedInPfWages = (bool) $component->included_in_pf_wages;
+                $this->includedInEsiWages = (bool) $component->included_in_esi_wages;
+                $this->benefitPlan = (string) ($component->benefit_plan ?? '');
+                $this->associateInvestment = (string) ($component->associate_investment ?? '');
+                $this->includeEmployerContribution = (bool) $component->include_employer_contribution;
+                $this->isSuperannuation = (bool) $component->is_superannuation;
+                $this->proRataBasis = (bool) $component->pro_rata_basis;
             }
         }
 
@@ -234,6 +305,14 @@ class CompensationHub extends Component
             'statutory_component' => $this->statutoryComponent !== '' ? $this->statutoryComponent : null,
             'is_taxable' => $this->isTaxable,
             'is_active' => $this->componentIsActive,
+            'is_payroll_adjustment' => $this->componentIsPayrollAdjustment,
+            'included_in_pf_wages' => $this->componentType === 'EARNING' && $this->includedInPfWages,
+            'included_in_esi_wages' => $this->componentType === 'EARNING' && $this->includedInEsiWages,
+            'benefit_plan' => $this->componentType === 'BENEFIT' ? ($this->benefitPlan !== '' ? $this->benefitPlan : null) : null,
+            'associate_investment' => $this->componentType === 'BENEFIT' ? ($this->associateInvestment !== '' ? $this->associateInvestment : null) : null,
+            'include_employer_contribution' => $this->componentType === 'BENEFIT' && $this->includeEmployerContribution,
+            'is_superannuation' => $this->componentType === 'BENEFIT' && $this->isSuperannuation,
+            'pro_rata_basis' => $this->componentType === 'BENEFIT' && $this->proRataBasis,
             'display_order' => $this->componentDisplayOrder,
         ];
 
@@ -285,6 +364,14 @@ class CompensationHub extends Component
         $this->isTaxable = true;
         $this->componentIsActive = true;
         $this->componentDisplayOrder = 0;
+        $this->componentIsPayrollAdjustment = false;
+        $this->includedInPfWages = false;
+        $this->includedInEsiWages = false;
+        $this->benefitPlan = '';
+        $this->associateInvestment = '';
+        $this->includeEmployerContribution = false;
+        $this->isSuperannuation = false;
+        $this->proRataBasis = false;
         $this->resetErrorBag();
     }
 
@@ -358,6 +445,10 @@ class CompensationHub extends Component
      */
     public function saveStructure(): void
     {
+        if (! $this->canManage()) {
+            return;
+        }
+
         $service = app(CompensationStructureService::class);
         $payload = [
             'structure_name' => $this->structureName,
@@ -402,8 +493,61 @@ class CompensationHub extends Component
      */
     public function deleteStructure(int $structureId): void
     {
+        if (! $this->canManage()) {
+            return;
+        }
+
         app(CompensationStructureService::class)->delete((int) $this->companyId, $structureId);
         session()->flash('success', 'Structure deleted.');
+    }
+
+    public function downloadStructureTemplate()
+    {
+        if (! $this->canManage()) {
+            return;
+        }
+
+        return Excel::download(new CompensationStructureTemplateExport(), 'compensation_structure_template.xlsx');
+    }
+
+    public function importStructuresFromExcel(): void
+    {
+        if (! $this->canManage()) {
+            return;
+        }
+
+        $this->isImportingStructures = true;
+        $this->structureImportMessage = '';
+        $this->structureImportError = '';
+
+        try {
+            $this->validate([
+                'structureImportFile' => 'required|file|mimes:xlsx,xls,csv|max:5120',
+            ]);
+
+            $import = new CompensationStructureImport();
+            Excel::import($import, $this->structureImportFile);
+
+            $result = app(CompensationStructureImportService::class)->import(
+                (int) $this->companyId,
+                $import->getRows(),
+                $import->getErrors(),
+            );
+
+            $this->structureImportMessage = "Imported {$result['created']} structure(s). Failed {$result['failed']} group(s).";
+            if (! empty($result['errors'])) {
+                $this->structureImportError = implode(PHP_EOL, array_slice($result['errors'], 0, 50));
+                if (count($result['errors']) > 50) {
+                    $this->structureImportError .= PHP_EOL . '...more errors not shown';
+                }
+            }
+
+            $this->reset('structureImportFile');
+        } catch (\Throwable $e) {
+            $this->structureImportError = 'Import failed: ' . $e->getMessage();
+        } finally {
+            $this->isImportingStructures = false;
+        }
     }
 
     /**
@@ -962,7 +1106,10 @@ class CompensationHub extends Component
     public function render()
     {
         $companyId = (int) $this->companyId;
-        $components = app(CompensationComponentService::class)->listForCompany($companyId);
+        $settingsAdapter = app(CompensationSettingsAdapter::class);
+        $activeOnly = ! $settingsAdapter->showInactiveComponents($companyId);
+        $components = app(CompensationComponentService::class)->listForCompany($companyId, $activeOnly);
+        $structureComponents = app(CompensationComponentService::class)->listStructureComponents($companyId);
         $structures = app(CompensationStructureService::class)->listForCompany($companyId);
         $assignments = app(CompensationAssignmentService::class)->listForCompany($companyId);
         $locations = Location::where('company_id', $companyId)->orderBy('location_name')->get();
@@ -1008,8 +1155,11 @@ class CompensationHub extends Component
 
         $assignmentScopeNames = $this->buildAssignmentScopeNames($assignments, $locations, $departments, $employees);
 
+        $company = Company::query()->find($companyId);
+
         return view('livewire.compensation-hub', [
             'components' => $components,
+            'structureComponents' => $structureComponents,
             'structures' => $structures,
             'assignments' => $assignments,
             'locations' => $locations,
@@ -1021,6 +1171,7 @@ class CompensationHub extends Component
             'assignmentStructurePreview' => $assignmentStructurePreview,
             'assignmentStructurePreviewSummary' => $assignmentStructurePreviewSummary,
             'assignmentScopeNames' => $assignmentScopeNames,
+            'companyName' => $company?->company_name ?? 'Company',
         ]);
     }
 

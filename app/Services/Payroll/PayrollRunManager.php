@@ -7,6 +7,7 @@ use App\Enums\Payroll\EmployeePayrollStatus;
 use App\Enums\Payroll\PayrollRunStatus;
 use App\Models\EmployeePayroll;
 use App\Models\PayrollRun;
+use App\Services\Observability\DomainTelemetry;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -16,6 +17,7 @@ class PayrollRunManager
         private readonly PayrollRunLifecycle $lifecycle,
         private readonly PayrollAuditLogger $auditLogger,
         private readonly PayrollHistoryRecorder $historyRecorder,
+        private readonly DomainTelemetry $telemetry,
     ) {}
 
     public function transitionRunStatus(PayrollRun $run, PayrollRunStatus $target, ?string $reason = null): PayrollRun
@@ -47,6 +49,13 @@ class PayrollRunManager
                 'payroll_run_manager',
             );
 
+            $this->telemetry->emit('payroll.run.status_changed', 'business', 'success', [
+                'company.id' => $run->company_id,
+                'payroll.run_id' => $run->id,
+                'from_status' => $oldStatus->value,
+                'to_status' => $target->value,
+            ]);
+
             return $run->fresh();
         });
     }
@@ -77,6 +86,13 @@ class PayrollRunManager
                 $payroll->payrollRun->company_id,
                 'payroll_run_manager',
             );
+
+            $this->telemetry->emit('payroll.employee.status_changed', 'business', 'success', [
+                'company.id' => $payroll->payrollRun->company_id,
+                'payroll.run_id' => $payroll->payroll_run_id,
+                'from_status' => $oldStatus->value,
+                'to_status' => $target->value,
+            ]);
 
             return $payroll->fresh();
         });

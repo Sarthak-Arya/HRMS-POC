@@ -23,7 +23,7 @@ class SignUpTest extends TestCase
         $this->seed(RoleSeeder::class);
     }
 
-    public function test_new_user_can_access_view_companies_after_signup(): void
+    public function test_new_user_is_redirected_to_add_company_after_signup(): void
     {
         Livewire::test(SignUp::class)
             ->set('name', 'Test User')
@@ -31,12 +31,13 @@ class SignUpTest extends TestCase
             ->set('password', 'password123')
             ->set('role', 'company_admin')
             ->call('register')
-            ->assertRedirect(route('view-companies'));
+            ->assertRedirect(route('add-company-details'));
 
         $user = User::query()->where('email', 'newuser@example.com')->first();
 
         $this->assertTrue($user->hasRole(UserRole::CompanyAdmin));
         $this->assertTrue($user->hasPermission('companies.view'));
+        $this->assertTrue($user->hasPermission('companies.manage_multiple'));
 
         $this->actingAs($user)
             ->get(route('view-companies'))
@@ -56,7 +57,7 @@ class SignUpTest extends TestCase
             ->set('password', 'password123')
             ->set('role', 'company_admin')
             ->call('register')
-            ->assertRedirect(route('view-companies'));
+            ->assertRedirect(route('add-company-details'));
 
         $user = User::query()->where('email', 'sync@example.com')->first();
 

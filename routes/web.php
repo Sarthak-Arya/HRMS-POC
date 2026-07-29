@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Livewire\AttendanceEntry;
+use App\Http\Livewire\AttendanceHub;
 use App\Http\Livewire\EmployeeList;
 use Illuminate\Support\Facades\Route;
 
@@ -19,16 +19,20 @@ use App\Http\Livewire\AddEmployeeDetails;
 use App\Http\Livewire\ViewEmployeeDetails;
 use App\Http\Livewire\AddCompanyDetails;
 use App\Http\Livewire\ViewCompanies;
+use App\Http\Livewire\GettingStarted;
 use App\Http\Livewire\CompensationHub;
 use App\Http\Livewire\EmployeeCompensation;
 use App\Http\Livewire\PayrollRunList;
 use App\Http\Livewire\PayrollRunDetail;
 use App\Http\Livewire\EmployeePayrollDetail;
 use App\Http\Livewire\PayrollHistory;
+use App\Http\Livewire\ReportHub;
+use App\Http\Livewire\SettingsHub;
 use App\Http\Livewire\AiAssistantPage;
 use App\Http\Controllers\PayslipController;
 
 use App\Http\Middleware\CompanyAccessMiddleware;
+use App\Services\Auth\AuthLandingService;
 
 use App\Http\Livewire\LaravelExamples\UserProfile;
 use App\Http\Livewire\LaravelExamples\UserManagement;
@@ -52,6 +56,10 @@ Route::get('/', function () {
     return redirect('/login');
 });
 
+Route::get('/healthz', [\App\Http\Controllers\Health\HealthController::class, 'liveness'])->name('health.liveness');
+Route::get('/readyz', [\App\Http\Controllers\Health\HealthController::class, 'readiness'])->name('health.readiness');
+Route::get('/metrics', [\App\Http\Controllers\Health\HealthController::class, 'metrics'])->name('metrics');
+
 Route::get('/sign-up', SignUp::class)->name('sign-up');
 Route::get('/login', Login::class)->name('login');
 
@@ -69,9 +77,15 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:companies.create')->group(function () {
         Route::get('/add-company-details', AddCompanyDetails::class)->name('add-company-details');
     });
-    Route::middleware('permission:companies.view')->group(function () {
+    Route::middleware('permission:companies.manage_multiple')->group(function () {
         Route::get('/view-companies', ViewCompanies::class)->name('view-companies');
     });
+    Route::get('/home', function (AuthLandingService $landing) {
+        $user = auth()->user();
+        abort_unless($user, 401);
+
+        return redirect()->to($landing->homeRoute($user));
+    })->name('home');
     Route::middleware('permission:employees.import')->group(function () {
         Route::post('/import-excel', [App\Http\Controllers\ImportExcel::class, 'import'])->name('import.excel');
 
@@ -83,6 +97,10 @@ Route::middleware('auth')->group(function () {
         Route::middleware([CompanyAccessMiddleware::class])->group(function () {
             Route::middleware('permission:dashboard.view')->group(function () {
                 Route::get('/dashboard', action: Dashboard::class)->name('dashboard');
+            });
+
+            Route::middleware('permission:settings.view')->group(function () {
+                Route::get('/getting-started', GettingStarted::class)->name('getting-started');
             });
 
             Route::middleware('permission:employees.create,employees.edit')->group(function () {
@@ -106,6 +124,7 @@ Route::middleware('auth')->group(function () {
                 Route::get('/payroll-history', action: PayrollHistory::class)->name('payroll-history');
                 Route::get('/payroll-runs/{run_id}/payslips/{employee_payroll_id}', [PayslipController::class, 'download'])->name('payroll.payslip');
                 Route::get('/payroll-runs/{run_id}/payslips', [PayslipController::class, 'downloadBulk'])->name('payroll.payslip.bulk');
+                Route::get('/payroll-runs/{run_id}/salary-sheet', [App\Http\Controllers\SalarySheetController::class, 'download'])->name('payroll.salary-sheet');
             });
 
             Route::middleware('permission:employees.view')->group(function () {
@@ -114,7 +133,24 @@ Route::middleware('auth')->group(function () {
             });
 
             Route::middleware('permission:attendance.view,attendance.manage')->group(function () {
-                Route::get('/attendance-entry', AttendanceEntry::class)->name('attendance-entry');
+                Route::get('/attendance', AttendanceHub::class)->name('attendance');
+                Route::get('/attendance-entry', function (string $company_id) {
+                    return redirect()->route('attendance', ['company_id' => $company_id]);
+                })->name('attendance-entry');
+            });
+
+            Route::middleware('permission:reports.view')->group(function () {
+                Route::get('/reports', ReportHub::class)->name('reports');
+            });
+
+            Route::middleware('permission:reports.run')->group(function () {
+                Route::get('/reports/salary-sheet/{run_id}', [App\Http\Controllers\SalarySheetController::class, 'download'])->name('reports.salary-sheet');
+            });
+
+            Route::middleware('permission:settings.view')->group(function () {
+                Route::get('/settings/{category?}', SettingsHub::class)
+                    ->where('category', 'organization-profile|attendance|compensation|reports|tax|statutory')
+                    ->name('settings');
             });
 
             Route::middleware('permission:ai.assistant.use')->group(function () {

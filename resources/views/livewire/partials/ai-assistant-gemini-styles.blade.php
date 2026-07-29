@@ -275,6 +275,7 @@
         display: flex;
         flex-direction: column;
         min-height: 0;
+        overflow: hidden;
     }
 
     .ai-gemini-main-header {
@@ -310,6 +311,19 @@
         flex-direction: column;
         overflow: hidden;
         position: relative;
+    }
+
+    .ai-gemini-messages-wrap {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        width: 100%;
+    }
+
+    .ai-gemini-shell--chat .ai-gemini-body {
+        padding-bottom: 0;
     }
 
     .ai-gemini-shell--welcome .ai-gemini-body {
@@ -365,6 +379,12 @@
         width: 100%;
         margin: 0 auto;
         background: transparent !important;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .ai-gemini-shell--chat .ai-gemini-messages {
+        padding-bottom: 24px;
     }
 
     .ai-gemini-shell--welcome .ai-gemini-messages {
@@ -441,10 +461,18 @@
 
     .ai-gemini-composer-wrap {
         flex-shrink: 0;
+        position: relative;
+        z-index: 3;
         padding: 0 24px 28px;
         width: 100%;
         max-width: 820px;
         margin: 0 auto;
+        background: linear-gradient(180deg, transparent 0%, var(--gemini-bg) 28%), var(--gemini-bg);
+    }
+
+    .ai-gemini-shell--chat .ai-gemini-composer-wrap {
+        margin-top: -12px;
+        padding-top: 12px;
     }
 
     .ai-gemini-shell--welcome .ai-gemini-composer-wrap {
@@ -648,3 +676,4 @@
         }
     }
 </style>
+@include('livewire.partials.ai-assistant-markdown-styles')

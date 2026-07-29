@@ -39,7 +39,7 @@ class CompensationResolverTest extends TestCase
         parent::setUp();
 
         $user = User::factory()->create();
-        $this->company = Company::factory()->create(['company_handled_by' => $user->id]);
+        $this->company = Company::factory()->ownedBy($user)->create();
         $this->department = Department::factory()->create(['company_id' => $this->company->id]);
         $this->location = Location::factory()->create(['company_id' => $this->company->id]);
 
@@ -101,24 +101,67 @@ class CompensationResolverTest extends TestCase
 
         $basic = $resolved->lines->firstWhere('componentId', $this->basicComponent->id);
         $this->assertSame(50000.0, $basic->monthlyAmount);
+        $this->assertSame(75000.0, $resolved->monthlyGross);
+        $this->assertSame(900000.0, $resolved->annualCtc);
     }
 
-    public function test_employee_history_overrides_department_assignment(): void
+    public function test_department_assignment_overrides_stale_employee_history(): void
     {
         EmployeeCompensationHistory::create([
             'company_id' => $this->company->id,
             'employee_id' => $this->employee->id,
             'structure_id' => $this->companyStructure->id,
-            'annual_ctc' => 600000,
-            'monthly_gross' => 50000,
+            'annual_ctc' => 0,
+            'monthly_gross' => 0,
             'effective_from' => now()->subMonth()->toDateString(),
         ]);
 
         $resolved = app(CompensationResolver::class)->resolveForEmployee($this->employee);
 
-        $this->assertSame($this->companyStructure->id, $resolved->structureId);
-        $this->assertSame('employee_history', $resolved->structureSource);
-        $this->assertSame(600000.0, $resolved->annualCtc);
+        $this->assertSame($this->departmentStructure->id, $resolved->structureId);
+        $this->assertSame('department_assignment', $resolved->structureSource);
+        $this->assertSame(75000.0, $resolved->monthlyGross);
+        $this->assertSame(900000.0, $resolved->annualCtc);
+    }
+
+    public function test_employee_scoped_assignment_overrides_department_assignment(): void
+    {
+        $employeeStructure = $this->makeStructure('Employee Specific', [
+            [$this->basicComponent, 60000, CalculationType::FIXED],
+            [$this->hraComponent, 50, CalculationType::PERCENT_BASIC],
+        ]);
+
+        CompensationStructureAssignment::create([
+            'company_id' => $this->company->id,
+            'scope_type' => CompensationScopeType::EMPLOYEE,
+            'scope_id' => $this->employee->id,
+            'structure_id' => $employeeStructure->id,
+            'effective_from' => now()->subYear()->toDateString(),
+        ]);
+
+        $resolved = app(CompensationResolver::class)->resolveForEmployee($this->employee);
+
+        $this->assertSame($employeeStructure->id, $resolved->structureId);
+        $this->assertSame('employee_assignment', $resolved->structureSource);
+        $this->assertSame(90000.0, $resolved->monthlyGross);
+    }
+
+    public function test_stored_ctc_and_gross_do_not_override_structure_calculation(): void
+    {
+        EmployeeCompensationHistory::create([
+            'company_id' => $this->company->id,
+            'employee_id' => $this->employee->id,
+            'structure_id' => $this->companyStructure->id,
+            'annual_ctc' => 999999,
+            'monthly_gross' => 888888,
+            'effective_from' => now()->subMonth()->toDateString(),
+        ]);
+
+        $resolved = app(CompensationResolver::class)->resolveForEmployee($this->employee);
+
+        $this->assertSame($this->departmentStructure->id, $resolved->structureId);
+        $this->assertSame(75000.0, $resolved->monthlyGross);
+        $this->assertSame(900000.0, $resolved->annualCtc);
     }
 
     public function test_employee_override_wins_over_company_override(): void

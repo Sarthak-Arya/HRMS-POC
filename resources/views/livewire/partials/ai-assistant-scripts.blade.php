@@ -17,7 +17,7 @@
     }
 
     function syncSttLangButtons(lang) {
-        document.querySelectorAll('.ai-assistant-root .ai-stt-lang-btn, .ai-assistant-root .ai-gemini-lang-chip').forEach(function (btn) {
+        document.querySelectorAll('.ai-assistant-root .ai-stt-lang-btn, .ai-assistant-root .ai-gemini-lang-chip, .ai-assistant-root .ui-ai-lang-chip').forEach(function (btn) {
             btn.classList.toggle('active', btn.dataset.lang === lang);
         });
     }
@@ -72,6 +72,11 @@
     });
     window.addEventListener('ai-conversation-loaded', function () {
         scrollAllAiMessages();
+        document.querySelectorAll('.ai-assistant-root .ai-assistant-input').forEach(function (input) {
+            input.focus();
+        });
+    });
+    window.addEventListener('ai-suggestion-applied', function () {
         document.querySelectorAll('.ai-assistant-root .ai-assistant-input').forEach(function (input) {
             input.focus();
         });

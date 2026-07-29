@@ -5,6 +5,8 @@ namespace App\Http\Livewire;
 use Livewire\Component;
 use App\Models\Company;
 use App\Imports\CompanyImport;
+use App\Enums\Settings\CompanySettingsSection;
+use App\Services\Settings\CompanySettingsService;
 use Livewire\WithFileUploads;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Log;
@@ -68,18 +70,57 @@ class AddCompanyDetails extends Component
         try {
             $this->validate();
 
+            $user = auth()->user();
+
             $company = Company::create(attributes: [
                 'company_name' => $this->companyName,
                 'is_esi' => $this->is_esi,
                 'is_pf' => $this->is_pf,
                 'company_address' => $this->address,
-                'company_handled_by' => auth()->id(),
+                'b2b_firm_id' => $user?->b2b_firm_id,
             ]);
 
+            // First company for a pure B2C user becomes their scoped company.
+            if ($user && $user->b2b_firm_id === null && $user->company_id === null) {
+                $user->forceFill(['company_id' => $company->id])->save();
+            }
+
+            $settingsService = app(CompanySettingsService::class);
+            $settingsService->ensureExists($company->id);
+
+            // Persist tax / registration fields captured on create into company settings.
+            $settingsService->updateSection(
+                $company->id,
+                CompanySettingsSection::CompanyProfile,
+                [
+                    'timezone' => 'Asia/Kolkata',
+                    'fiscalYearStartMonth' => 4,
+                    'payrollCurrency' => 'INR',
+                    'dateFormat' => 'd M Y',
+                    'gstNumber' => $this->gstNumber ?: null,
+                    'zipCode' => $this->zipCode ?: null,
+                    'state' => $this->state ?: null,
+                    'country' => $this->country ?: null,
+                    'esiCode' => $this->esiCode ?: null,
+                    'esiContribution' => $this->esiContribution ?: null,
+                    'esiCoverageStartDate' => $this->esiCoverageStartDate ?: null,
+                    'esiCoverageEndDate' => $this->esiCoverageEndDate ?: null,
+                    'pfCode' => $this->pfCode ?: null,
+                    'pfContribution' => $this->pfContribution ?: null,
+                    'pfCoverageStartDate' => $this->pfCoverageStartDate ?: null,
+                    'pfCoverageEndDate' => $this->pfCoverageEndDate ?: null,
+                ],
+                1,
+                auth()->id(),
+            );
+
+            session()->put('companyId', (string) $company->id);
             $this->showConfirmPopup = false;
-            $this->alertMessage = 'Company details saved successfully.';
-            $this->alertType = 'success';
             Log::info(message: 'Company details saved successfully.');
+
+            $this->redirect(route('getting-started', ['company_id' => $company->id]));
+
+            return;
         } catch (\Illuminate\Database\QueryException $e) {
             Log::error(message: 'Database error: ' . $e->getMessage());
             $this->alertMessage = 'Company details not saved successfully due to a database error.';

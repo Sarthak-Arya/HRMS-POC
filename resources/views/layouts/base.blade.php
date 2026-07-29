@@ -32,13 +32,14 @@
     <!-- Nucleo Icons -->
     <link href="{{ asset('assets/css/nucleo-icons.css') }}" rel="stylesheet" />
     <link href="{{ asset('assets/css/nucleo-svg.css') }}" rel="stylesheet" />
-    <!-- Font Awesome Icons -->
-    <script src="https://kit.fontawesome.com/42d5adcbca.js" crossorigin="anonymous"></script>
-    <link href="{{ asset('assets/css/nucleo-svg.css') }}" rel="stylesheet" />
     <!-- CSS Files -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link id="pagestyle" href="{{ asset('assets/css/soft-ui-dashboard.css') }}?v=1" rel="stylesheet" />
     <link href="{{ asset('assets/css/dark-mode.css') }}?v=9" rel="stylesheet" />
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0" />
+    @stack('styles')
+    <link href="{{ asset('assets/css/app-dashboard.css') }}?v=13" rel="stylesheet" />
     <!-- Alpine -->
     <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
     @livewireStyles
@@ -61,7 +62,7 @@
 
         @media (min-width: 1200px) {
             body.g-sidenav-pinned .sidenav.fixed-start ~ .main-content {
-                margin-left: 17.125rem;
+                margin-left: calc(16rem + 1.5rem);
             }
         }
 
@@ -252,6 +253,7 @@
             });
         })();
     </script>
+    @stack('scripts')
     @livewireScripts
 </body>
 

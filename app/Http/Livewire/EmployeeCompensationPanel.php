@@ -4,7 +4,6 @@ namespace App\Http\Livewire;
 
 use App\Models\CompensationStructure;
 use App\Models\Employee;
-use App\Services\Compensation\CompensationResolver;
 use App\Services\Compensation\EmployeeCompensationService;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -24,12 +23,6 @@ class EmployeeCompensationPanel extends Component
     /** @var string Selected compensation structure ID */
     public string $structureId = '';
 
-    /** @var string|float Annual Cost to Company (CTC) */
-    public $annualCtc = '';
-
-    /** @var string|float Monthly Gross salary */
-    public $monthlyGross = '';
-
     /** @var string Date the revision is effective from */
     public string $effectiveFrom = '';
 
@@ -38,10 +31,6 @@ class EmployeeCompensationPanel extends Component
 
     /**
      * Initialize the component with data for a specific employee.
-     *
-     * @param string $companyId The ID of the company.
-     * @param string $employeeId The ID of the employee.
-     * @return void
      */
     public function mount(string $companyId, string $employeeId): void
     {
@@ -55,30 +44,13 @@ class EmployeeCompensationPanel extends Component
 
         if ($active) {
             $this->structureId = (string) $active->structure_id;
-            $this->annualCtc = $active->annual_ctc;
-            $this->monthlyGross = $active->monthly_gross;
             $this->effectiveFrom = $active->effective_from->toDateString();
             $this->revisionReason = $active->revision_reason ?? '';
         }
     }
 
     /**
-     * Hook called when annualCtc property is updated.
-     * Automatically calculates monthly gross.
-     *
-     * @return void
-     */
-    public function updatedAnnualCtc(): void
-    {
-        if ($this->annualCtc !== '' && is_numeric($this->annualCtc)) {
-            $this->monthlyGross = round((float) $this->annualCtc / 12, 2);
-        }
-    }
-
-    /**
      * Save the compensation revision.
-     *
-     * @return void
      */
     public function saveRevision(): void
     {
@@ -88,8 +60,6 @@ class EmployeeCompensationPanel extends Component
                 (int) $this->employeeId,
                 [
                     'structure_id' => (int) $this->structureId,
-                    'annual_ctc' => $this->annualCtc,
-                    'monthly_gross' => $this->monthlyGross !== '' ? $this->monthlyGross : null,
                     'effective_from' => $this->effectiveFrom,
                     'revision_reason' => $this->revisionReason ?: null,
                 ],
@@ -104,8 +74,6 @@ class EmployeeCompensationPanel extends Component
 
     /**
      * Render the component view.
-     *
-     * @return \Illuminate\View\View The rendered view.
      */
     public function render()
     {
@@ -121,9 +89,14 @@ class EmployeeCompensationPanel extends Component
         $history = app(EmployeeCompensationService::class)
             ->historyForEmployee((int) $this->companyId, (int) $this->employeeId);
 
-        $resolved = $employee
-            ? app(CompensationResolver::class)->resolveForEmployee($employee)
-            : null;
+        $resolved = null;
+        if ($employee && $this->structureId !== '') {
+            $resolved = app(EmployeeCompensationService::class)->resolvePreview(
+                (int) $this->companyId,
+                (int) $this->employeeId,
+                (int) $this->structureId,
+            );
+        }
 
         return view('livewire.employee-compensation-panel', [
             'employee' => $employee,
