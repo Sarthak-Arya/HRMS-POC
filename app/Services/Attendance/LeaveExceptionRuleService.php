@@ -35,7 +35,16 @@ class LeaveExceptionRuleService
     {
         $validated = $this->validate($data);
 
-        return AttendanceLeaveExceptionRule::create(array_merge($validated, ['company_id' => $companyId]));
+        $rule = AttendanceLeaveExceptionRule::create(array_merge($validated, ['company_id' => $companyId]));
+
+        app(AttendanceAuditService::class)->log(
+            $companyId,
+            'attendance_leave_exception_rule',
+            $rule->id,
+            'leave_exception_changed',
+        );
+
+        return $rule;
     }
 
     /**
@@ -47,12 +56,28 @@ class LeaveExceptionRuleService
         $validated = $this->validate($data);
         $rule->update($validated);
 
-        return $rule->fresh(['leaveType', 'policy']);
+        $fresh = $rule->fresh(['leaveType', 'policy']);
+
+        app(AttendanceAuditService::class)->log(
+            $companyId,
+            'attendance_leave_exception_rule',
+            $fresh->id,
+            'leave_exception_changed',
+        );
+
+        return $fresh;
     }
 
     public function delete(int $companyId, int $ruleId): void
     {
         AttendanceLeaveExceptionRule::where('company_id', $companyId)->findOrFail($ruleId)->delete();
+
+        app(AttendanceAuditService::class)->log(
+            $companyId,
+            'attendance_leave_exception_rule',
+            $ruleId,
+            'leave_exception_changed',
+        );
     }
 
     /**

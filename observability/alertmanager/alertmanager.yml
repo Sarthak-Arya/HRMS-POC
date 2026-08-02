@@ -22,17 +22,16 @@ receivers:
       - url: "http://127.0.0.1:9/noop"
         send_resolved: false
 
+  # Local POC: email is a no-op webhook unless ALERT_EMAIL_TO + real SMTP are configured
+  # via env substitution in a production overlay. Avoids shell-style defaults that break YAML.
   - name: oncall
-    email_configs:
-      - to: "${ALERT_EMAIL_TO:-oncall@example.com}"
-        from: "alertmanager@payroll.local"
-        smarthost: "${ALERT_SMTP_HOST:-localhost:25}"
-        require_tls: false
+    webhook_configs:
+      - url: "http://127.0.0.1:9/noop"
         send_resolved: true
 
   - name: warning
     webhook_configs:
-      - url: "${ALERT_WEBHOOK_URL:-http://127.0.0.1:9/noop}"
+      - url: "http://127.0.0.1:9/noop"
         send_resolved: true
 
 inhibit_rules:

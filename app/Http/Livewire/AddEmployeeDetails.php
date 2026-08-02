@@ -332,10 +332,8 @@ class AddEmployeeDetails extends Component
      *
      * @return \Illuminate\Http\RedirectResponse|void
      */
-    public function save()
+    public function save(\App\Services\Observability\DomainTelemetry $telemetry)
     {
-        Log::debug("Saving employee data");
-
         try {
             $this->validate();
 
@@ -372,10 +370,10 @@ class AddEmployeeDetails extends Component
             $this->resetExcept('companyId');
         }
         catch(QueryException $e){
-            Log::error("Error occurred in saving employee to database due to SQL Exception: " . $e->getMessage(), [
-                'company_id' => $this->companyId,
-                'employee_code' => $this->employeeCompanyCode,
-            ]);
+            $telemetry->emit('employee.save.failed', 'business', 'failure', [
+                'company.id' => (int) $this->companyId,
+                'error.type' => QueryException::class,
+            ], 'error');
             $message = config('app.debug')
                 ? ('Failed to save employee details: ' . $e->getMessage())
                 : 'Failed to save employee details. Database error occurred.';
@@ -386,10 +384,10 @@ class AddEmployeeDetails extends Component
             throw $e;
         }
         catch(Exception $e){
-            Log::error("Error occurred in saving employee: " . $e->getMessage(), [
-                'company_id' => $this->companyId,
-                'employee_code' => $this->employeeCompanyCode,
-            ]);
+            $telemetry->emit('employee.save.failed', 'business', 'failure', [
+                'company.id' => (int) $this->companyId,
+                'error.type' => $e::class,
+            ], 'error');
             $message = config('app.debug')
                 ? ('Failed to save employee details: ' . $e->getMessage())
                 : 'Failed to save employee details. Please try again.';
@@ -402,7 +400,7 @@ class AddEmployeeDetails extends Component
      *
      * @return void
      */
-    public function importEmployees()
+    public function importEmployees(\App\Services\Observability\DomainTelemetry $telemetry)
     {
         try {
             $this->isImporting = true;
@@ -413,10 +411,9 @@ class AddEmployeeDetails extends Component
                 'excelFile' => 'required|file|mimes:xlsx,xls,csv|max:5120',
             ]);
 
-            Log::info('Starting employee import', [
-                'user_id' => auth()->id(),
-                'company_id' => $this->companyId,
-                'file_name' => $this->excelFile ? $this->excelFile->getClientOriginalName() : null
+            $companyId = (int) $this->companyId;
+            $telemetry->emit('employee.import.started', 'business', 'success', [
+                'company.id' => $companyId,
             ]);
 
             $headingRow = 1;
@@ -425,17 +422,27 @@ class AddEmployeeDetails extends Component
                 $headingRow = app(EmployeeService::class)->detectHeadingRow($realPath);
             }
 
-            $import = new EmployeeImport((int) $this->companyId, (int) $headingRow);
+            $import = new EmployeeImport($companyId, (int) $headingRow);
             Excel::import($import, $this->excelFile);
 
             $errors = $import->getErrors();
 
             $stats = method_exists($import, 'getImportStats') ? $import->getImportStats() : null;
+            $imported = (int) ($stats['imported'] ?? 0);
+            $failed = (int) ($stats['failed'] ?? count($errors));
+
             if ($stats) {
                 $this->importMessage = "Imported {$stats['imported']} employees. Failed {$stats['failed']} rows. (Header row: {$headingRow})";
             } else {
                 $this->importMessage = 'Employee import finished.';
             }
+
+            $telemetry->emit('employee.import.completed', 'business', $failed > 0 ? 'failure' : 'success', [
+                'company.id' => $companyId,
+                'processed_count' => $imported,
+                'failed_count' => $failed,
+                'skipped_count' => 0,
+            ], $failed > 0 ? 'warning' : 'info');
 
             if (!empty($errors)) {
                 $this->importError = "Some rows were skipped/failed:\n";
@@ -445,13 +452,12 @@ class AddEmployeeDetails extends Component
                 if (count($errors) > 50) {
                     $this->importError .= '...more errors not shown';
                 }
-                Log::warning('Employee import completed with errors', [
-                    'user_id' => auth()->id(),
-                    'company_id' => $this->companyId,
-                    'errors' => $errors,
-                ]);
             }
         } catch (\Exception $e) {
+            $telemetry->emit('employee.import.completed', 'business', 'failure', [
+                'company.id' => (int) $this->companyId,
+                'error.type' => $e::class,
+            ], 'error');
             $this->importError = 'Error importing data: ' . $e->getMessage();
         } finally {
             $this->isImporting = false;

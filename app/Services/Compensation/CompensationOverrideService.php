@@ -5,6 +5,7 @@ namespace App\Services\Compensation;
 use App\Enums\Compensation\CompensationScopeType;
 use App\Models\CompensationOverride;
 use App\Models\Employee;
+use App\Services\Observability\DomainTelemetry;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -12,6 +13,11 @@ use Illuminate\Validation\ValidationException;
 
 class CompensationOverrideService
 {
+    public function __construct(
+        private readonly DomainTelemetry $telemetry,
+    ) {
+    }
+
     /**
      * @return Collection<int, CompensationOverride>
      */
@@ -40,17 +46,27 @@ class CompensationOverrideService
 
         $this->assertScopeBelongsToCompany($companyId, $scopeType, $scopeId);
 
-        return CompensationOverride::create([
+        $override = CompensationOverride::create([
             ...$validated,
             'company_id' => $companyId,
             'scope_id' => $scopeType === CompensationScopeType::COMPANY ? null : $scopeId,
             'created_by' => Auth::id(),
         ]);
+
+        $this->telemetry->emit('compensation.override.changed', 'audit', 'success', [
+            'company.id' => $companyId,
+        ]);
+
+        return $override;
     }
 
     public function delete(int $companyId, int $overrideId): void
     {
         CompensationOverride::where('company_id', $companyId)->findOrFail($overrideId)->delete();
+
+        $this->telemetry->emit('compensation.override.changed', 'audit', 'success', [
+            'company.id' => $companyId,
+        ]);
     }
 
     private function assertScopeBelongsToCompany(int $companyId, CompensationScopeType $scopeType, ?int $scopeId): void

@@ -4,6 +4,7 @@ namespace App\Services\Compensation;
 
 use App\Models\Employee;
 use App\Models\EmployeeCompensationHistory;
+use App\Services\Observability\DomainTelemetry;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +14,11 @@ use Illuminate\Validation\ValidationException;
 
 class EmployeeCompensationService
 {
+    public function __construct(
+        private readonly DomainTelemetry $telemetry,
+    ) {
+    }
+
     /**
      * @return Collection<int, EmployeeCompensationHistory>
      */
@@ -51,7 +57,7 @@ class EmployeeCompensationService
             ]);
         }
 
-        return DB::transaction(function () use ($companyId, $employeeId, $validated, $resolved, $effectiveFrom) {
+        $history = DB::transaction(function () use ($companyId, $employeeId, $validated, $resolved, $effectiveFrom) {
             EmployeeCompensationHistory::where('employee_id', $employeeId)
                 ->whereNull('effective_to')
                 ->where('effective_from', '<', $effectiveFrom)
@@ -69,6 +75,12 @@ class EmployeeCompensationService
                 'approved_by' => Auth::id(),
             ]);
         });
+
+        $this->telemetry->emit('compensation.assignment.changed', 'audit', 'success', [
+            'company.id' => $companyId,
+        ]);
+
+        return $history;
     }
 
     public function resolvePreview(int $companyId, int $employeeId, ?int $structureId = null): ResolvedCompensation

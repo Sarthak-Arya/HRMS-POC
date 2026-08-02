@@ -5,13 +5,16 @@ namespace App\Support\Observability;
 /**
  * In-process Prometheus-compatible metric registry.
  * Labels are cardinality-bounded. Export via /metrics or OTLP.
+ *
+ * Under php-fpm / artisan serve the app boots per request, so counters are
+ * persisted to a local file so Prometheus scrapes see cumulative values.
  */
 class MetricsRegistry
 {
     /** @var array<string, array{help: string, type: string, samples: array<string, float>}> */
     private array $counters = [];
 
-    /** @var array<string, array{help: string, type: string, samples: array<string, array{count: int, sum: float}>}> */
+    /** @var array<string, array{help: string, type: string, samples: array<string, array{count: int, sum: float, buckets: array<string, int>}>}> */
     private array $histograms = [];
 
     /** @var array<string, array{help: string, type: string, samples: array<string, float>}> */
@@ -20,17 +23,25 @@ class MetricsRegistry
     /** @var list<float> */
     private array $buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
 
+    private bool $loaded = false;
+
+    private bool $dirty = false;
+
     public function increment(string $name, array $labels = [], float $by = 1.0, string $help = ''): void
     {
+        $this->ensureLoaded();
         $key = $this->labelKey($labels);
         if (! isset($this->counters[$name])) {
             $this->counters[$name] = ['help' => $help ?: $name, 'type' => 'counter', 'samples' => []];
         }
         $this->counters[$name]['samples'][$key] = ($this->counters[$name]['samples'][$key] ?? 0) + $by;
+        $this->dirty = true;
+        $this->persist();
     }
 
     public function observe(string $name, float $seconds, array $labels = [], string $help = ''): void
     {
+        $this->ensureLoaded();
         $key = $this->labelKey($labels);
         if (! isset($this->histograms[$name])) {
             $this->histograms[$name] = ['help' => $help ?: $name, 'type' => 'histogram', 'samples' => []];
@@ -48,15 +59,20 @@ class MetricsRegistry
             }
         }
         $this->histograms[$name]['samples'][$key] = $sample;
+        $this->dirty = true;
+        $this->persist();
     }
 
     public function gauge(string $name, float $value, array $labels = [], string $help = ''): void
     {
+        $this->ensureLoaded();
         $key = $this->labelKey($labels);
         if (! isset($this->gauges[$name])) {
             $this->gauges[$name] = ['help' => $help ?: $name, 'type' => 'gauge', 'samples' => []];
         }
         $this->gauges[$name]['samples'][$key] = $value;
+        $this->dirty = true;
+        $this->persist();
     }
 
     private function environment(): string
@@ -127,13 +143,14 @@ class MetricsRegistry
 
     public function renderPrometheus(): string
     {
+        $this->ensureLoaded();
         $lines = [];
 
         foreach ($this->counters as $name => $meta) {
             $lines[] = "# HELP {$name} {$meta['help']}";
             $lines[] = "# TYPE {$name} counter";
             foreach ($meta['samples'] as $labelKey => $value) {
-                $lines[] = "{$name}{{$labelKey}} ".$this->formatFloat($value);
+                $lines[] = "{$name}{{$labelKey}} ".$this->formatFloat((float) $value);
             }
         }
 
@@ -141,7 +158,7 @@ class MetricsRegistry
             $lines[] = "# HELP {$name} {$meta['help']}";
             $lines[] = "# TYPE {$name} gauge";
             foreach ($meta['samples'] as $labelKey => $value) {
-                $lines[] = "{$name}{{$labelKey}} ".$this->formatFloat($value);
+                $lines[] = "{$name}{{$labelKey}} ".$this->formatFloat((float) $value);
             }
         }
 
@@ -149,16 +166,16 @@ class MetricsRegistry
             $lines[] = "# HELP {$name} {$meta['help']}";
             $lines[] = "# TYPE {$name} histogram";
             foreach ($meta['samples'] as $labelKey => $sample) {
-                $cumulative = 0;
                 foreach ($this->buckets as $bound) {
                     $bKey = (string) $bound;
-                    $cumulative += $sample['buckets'][$bKey] ?? 0;
+                    // Buckets already store cumulative counts (obs with duration <= bound).
+                    $count = (int) ($sample['buckets'][$bKey] ?? 0);
                     $leLabels = $labelKey === '' ? "le=\"{$bound}\"" : $labelKey.",le=\"{$bound}\"";
-                    $lines[] = "{$name}_bucket{{$leLabels}} {$cumulative}";
+                    $lines[] = "{$name}_bucket{{$leLabels}} {$count}";
                 }
                 $infLabels = $labelKey === '' ? 'le="+Inf"' : $labelKey.',le="+Inf"';
                 $lines[] = "{$name}_bucket{{$infLabels}} {$sample['count']}";
-                $lines[] = "{$name}_sum{{$labelKey}} ".$this->formatFloat($sample['sum']);
+                $lines[] = "{$name}_sum{{$labelKey}} ".$this->formatFloat((float) $sample['sum']);
                 $lines[] = "{$name}_count{{$labelKey}} {$sample['count']}";
             }
         }
@@ -167,17 +184,117 @@ class MetricsRegistry
     }
 
     /**
-     * Snapshot for OTLP export (counters + gauges only for simplicity).
-     *
-     * @return array{counters: array<string, mixed>, gauges: array<string, mixed>}
+     * @return array{counters: array<string, mixed>, gauges: array<string, mixed>, histograms: array<string, mixed>}
      */
     public function snapshot(): array
     {
+        $this->ensureLoaded();
+
         return [
             'counters' => $this->counters,
             'gauges' => $this->gauges,
             'histograms' => $this->histograms,
         ];
+    }
+
+    private function ensureLoaded(): void
+    {
+        if ($this->loaded) {
+            return;
+        }
+
+        $this->loaded = true;
+
+        if ($this->shouldSkipPersistence()) {
+            return;
+        }
+
+        $path = $this->persistPath();
+        if (! is_file($path)) {
+            return;
+        }
+
+        $fh = @fopen($path, 'rb');
+        if ($fh === false) {
+            return;
+        }
+
+        try {
+            flock($fh, LOCK_SH);
+            $raw = stream_get_contents($fh);
+            flock($fh, LOCK_UN);
+        } finally {
+            fclose($fh);
+        }
+
+        if (! is_string($raw) || $raw === '') {
+            return;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded)) {
+            return;
+        }
+
+        $this->counters = is_array($decoded['counters'] ?? null) ? $decoded['counters'] : [];
+        $this->gauges = is_array($decoded['gauges'] ?? null) ? $decoded['gauges'] : [];
+        $this->histograms = is_array($decoded['histograms'] ?? null) ? $decoded['histograms'] : [];
+    }
+
+    private function persist(): void
+    {
+        if (! $this->dirty || $this->shouldSkipPersistence()) {
+            return;
+        }
+
+        $path = $this->persistPath();
+        $dir = dirname($path);
+        if (! is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+
+        $payload = json_encode([
+            'counters' => $this->counters,
+            'gauges' => $this->gauges,
+            'histograms' => $this->histograms,
+        ], JSON_THROW_ON_ERROR);
+
+        $fh = @fopen($path, 'c+b');
+        if ($fh === false) {
+            return;
+        }
+
+        try {
+            flock($fh, LOCK_EX);
+            ftruncate($fh, 0);
+            rewind($fh);
+            fwrite($fh, $payload);
+            fflush($fh);
+            flock($fh, LOCK_UN);
+            $this->dirty = false;
+        } catch (\Throwable) {
+            // Metrics must never break the app.
+        } finally {
+            fclose($fh);
+        }
+    }
+
+    private function shouldSkipPersistence(): bool
+    {
+        try {
+            return app()->environment('testing');
+        } catch (\Throwable) {
+            return (string) (getenv('APP_ENV') ?: '') === 'testing';
+        }
+    }
+
+    private function persistPath(): string
+    {
+        try {
+            return storage_path('framework/cache/observability-metrics.json');
+        } catch (\Throwable) {
+            return sys_get_temp_dir().'/payroll-observability-metrics.json';
+        }
     }
 
     /**
@@ -191,7 +308,6 @@ class MetricsRegistry
             if ($v === null || $v === '') {
                 continue;
             }
-            // Reject high-cardinality accidental IDs in label values.
             if (preg_match('/id$/i', (string) $k) || preg_match('/^[0-9a-f-]{20,}$/i', (string) $v)) {
                 continue;
             }

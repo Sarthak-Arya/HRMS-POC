@@ -8,6 +8,7 @@ use App\Models\CompensationComponent;
 use App\Models\Employee;
 use App\Models\PayrollAdjustment;
 use App\Models\PayrollRun;
+use App\Services\Observability\DomainTelemetry;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,10 @@ use Illuminate\Validation\ValidationException;
 
 class PayrollAdjustmentService
 {
+    public function __construct(
+        private readonly DomainTelemetry $telemetry,
+    ) {}
+
     /**
      * @return Collection<int, CompensationComponent>
      */
@@ -111,6 +116,12 @@ class PayrollAdjustmentService
                 'adjustmentRows' => 'Add at least one complete adjustment row before saving.',
             ]);
         }
+
+        $this->telemetry->emit('compensation.adjustment.applied', 'business', 'success', [
+            'company.id' => (int) $run->company_id,
+            'payroll.run_id' => $run->id,
+            'processed_count' => $saved,
+        ]);
 
         return ['saved' => $saved, 'skipped' => $skipped];
     }
@@ -264,6 +275,12 @@ class PayrollAdjustmentService
                 $saved++;
             }
         });
+
+        $this->telemetry->emit('compensation.adjustment.applied', 'business', 'success', [
+            'company.id' => (int) $run->company_id,
+            'payroll.run_id' => $run->id,
+            'processed_count' => $saved,
+        ]);
 
         return ['saved' => $saved, 'deleted' => $deleted];
     }

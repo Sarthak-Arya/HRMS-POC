@@ -12,10 +12,10 @@ use App\Models\MonthlyAttendance;
 use App\Models\LeaveType;
 use App\Models\Location;
 use Maatwebsite\Excel\Facades\Excel;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 use App\Exports\AttendanceTemplateExport;
+use App\Services\Observability\DomainTelemetry;
 
 class AttendanceEntry extends Component
 {
@@ -221,8 +221,11 @@ class AttendanceEntry extends Component
             }
             session()->flash('import_message', 'Monthly attendance imported successfully.');
         } catch (\Exception $e) {
-            Log::error('Attendance import error: ' . $e->getMessage());
-            session()->flash('import_message', 'Error importing attendance: ' . $e->getMessage());
+            app(DomainTelemetry::class)->emit('attendance.import.completed', 'business', 'failure', [
+                'company.id' => (int) session()->get('companyId'),
+                'error.type' => $e::class,
+            ], 'error');
+            session()->flash('import_message', 'Error importing attendance.');
         }
     }
 

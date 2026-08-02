@@ -34,7 +34,7 @@ exporters:
     endpoint: tempo:4317
     tls:
       insecure: true
-  logging:
+  debug:
     verbosity: basic
 
 service:
@@ -42,7 +42,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch, attributes/redact]
-      exporters: [otlp/tempo, logging]
+      exporters: [otlp/tempo, debug]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch]

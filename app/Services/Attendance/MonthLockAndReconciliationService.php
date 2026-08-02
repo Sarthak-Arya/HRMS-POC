@@ -24,6 +24,19 @@ class MonthLockAndReconciliationService
     public function lockMonthForEmployee(Employee $employee, int $month, int $year): void
     {
         if (! $this->isMonthLockEnforced((int) $employee->company_id)) {
+            $this->auditService->log(
+                (int) $employee->company_id,
+                'employee_attendance_summary',
+                null,
+                'lock_failed',
+                null,
+                null,
+                [
+                    'month' => $month,
+                    'year' => $year,
+                    'error.type' => 'month_lock_disabled',
+                ],
+            );
             throw new \InvalidArgumentException('Month lock is disabled in company settings.');
         }
         $summary = MonthlyAttendance::query()
@@ -34,6 +47,19 @@ class MonthLockAndReconciliationService
             ->first();
 
         if (! $summary) {
+            $this->auditService->log(
+                (int) $employee->company_id,
+                'employee_attendance_summary',
+                null,
+                'lock_failed',
+                null,
+                null,
+                [
+                    'month' => $month,
+                    'year' => $year,
+                    'error.type' => 'summary_missing',
+                ],
+            );
             throw new \InvalidArgumentException('No attendance summary found to lock.');
         }
 

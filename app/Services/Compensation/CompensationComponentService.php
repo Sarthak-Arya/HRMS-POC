@@ -3,6 +3,7 @@
 namespace App\Services\Compensation;
 
 use App\Models\CompensationComponent;
+use App\Services\Observability\DomainTelemetry;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -11,6 +12,11 @@ use Illuminate\Validation\ValidationException;
 
 class CompensationComponentService
 {
+    public function __construct(
+        private readonly DomainTelemetry $telemetry,
+    ) {
+    }
+
     /**
      * @return Collection<int, CompensationComponent>
      */
@@ -58,11 +64,18 @@ class CompensationComponentService
     {
         $validated = $this->validate($companyId, $data);
 
-        return CompensationComponent::create([
+        $component = CompensationComponent::create([
             ...$validated,
             'company_id' => $companyId,
             'created_by' => Auth::id(),
         ]);
+
+        $this->telemetry->emit('compensation.component.changed', 'audit', 'success', [
+            'company.id' => $companyId,
+            'status' => $component->component_type,
+        ]);
+
+        return $component;
     }
 
     /**
@@ -74,7 +87,14 @@ class CompensationComponentService
         $validated = $this->validate($companyId, $data, $componentId);
         $component->update($validated);
 
-        return $component->fresh();
+        $component = $component->fresh();
+
+        $this->telemetry->emit('compensation.component.changed', 'audit', 'success', [
+            'company.id' => $companyId,
+            'status' => $component->component_type,
+        ]);
+
+        return $component;
     }
 
     public function deactivate(int $companyId, int $componentId): CompensationComponent
@@ -82,7 +102,14 @@ class CompensationComponentService
         $component = CompensationComponent::where('company_id', $companyId)->findOrFail($componentId);
         $component->update(['is_active' => false]);
 
-        return $component->fresh();
+        $component = $component->fresh();
+
+        $this->telemetry->emit('compensation.component.changed', 'audit', 'success', [
+            'company.id' => $companyId,
+            'status' => $component->component_type,
+        ]);
+
+        return $component;
     }
 
     /**

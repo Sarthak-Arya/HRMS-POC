@@ -27,7 +27,16 @@ class LeaveTypeService
     {
         $validated = $this->validate($data, $companyId);
 
-        return LeaveType::create(array_merge($validated, ['company_id' => $companyId]));
+        $leaveType = LeaveType::create(array_merge($validated, ['company_id' => $companyId]));
+
+        app(AttendanceAuditService::class)->log(
+            $companyId,
+            'leave_type',
+            $leaveType->id,
+            'leave_type_changed',
+        );
+
+        return $leaveType;
     }
 
     /**
@@ -39,12 +48,28 @@ class LeaveTypeService
         $validated = $this->validate($data, $companyId, $leaveTypeId);
         $leaveType->update($validated);
 
-        return $leaveType->fresh();
+        $fresh = $leaveType->fresh();
+
+        app(AttendanceAuditService::class)->log(
+            $companyId,
+            'leave_type',
+            $fresh->id,
+            'leave_type_changed',
+        );
+
+        return $fresh;
     }
 
     public function deactivate(int $companyId, int $leaveTypeId): void
     {
         LeaveType::where('company_id', $companyId)->findOrFail($leaveTypeId)->update(['is_active' => false]);
+
+        app(AttendanceAuditService::class)->log(
+            $companyId,
+            'leave_type',
+            $leaveTypeId,
+            'leave_type_changed',
+        );
     }
 
     /**

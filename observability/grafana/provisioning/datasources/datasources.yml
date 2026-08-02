@@ -28,10 +28,24 @@ datasources:
     uid: elasticsearch
     editable: false
     jsonData:
-      index: payroll-logs-*
+      index: "payroll-logs-*,payroll-security-*"
       timeField: "@timestamp"
       logMessageField: message
       logLevelField: severity
+      includeFrozen: false
+
+  - name: Elasticsearch-Security
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    uid: elasticsearch-security
+    editable: false
+    jsonData:
+      index: "payroll-security-*"
+      timeField: "@timestamp"
+      logMessageField: message
+      logLevelField: severity
+      includeFrozen: false
 
   - name: MySQL-Audits
     type: mysql

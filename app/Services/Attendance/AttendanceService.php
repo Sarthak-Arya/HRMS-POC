@@ -153,35 +153,70 @@ class AttendanceService
     public function importFromExcel(int $companyId, string $filePath, ?int $defaultMonth = null, ?int $defaultYear = null): array
     {
         if (! Schema::hasTable('employee_attendance_summaries')) {
-            return [
+            $result = [
                 'created' => 0,
                 'updated' => 0,
                 'failed' => 1,
                 'skipped' => 0,
                 'errors' => [0 => 'Monthly attendance summaries are not configured.'],
             ];
+            $this->emitImportCompleted($companyId, $defaultMonth, $defaultYear, $result);
+
+            return $result;
         }
 
         $parsed = $this->parseExcelRecords($companyId, $filePath, $defaultMonth, $defaultYear);
         if ($parsed['records'] === [] && $parsed['errors'] !== []) {
-            return [
+            $result = [
                 'created' => 0,
                 'updated' => 0,
                 'failed' => count($parsed['errors']),
                 'skipped' => $parsed['skipped'],
                 'errors' => $parsed['errors'],
             ];
+            $this->emitImportCompleted($companyId, $defaultMonth, $defaultYear, $result);
+
+            return $result;
         }
 
         $result = $this->bulkUpsertFromAgent($companyId, $parsed['records']);
 
-        return [
+        $merged = [
             'created' => $result['created'],
             'updated' => $result['updated'],
             'failed' => $result['failed'] + count($parsed['errors']),
             'skipped' => $parsed['skipped'],
             'errors' => $parsed['errors'] + $result['errors'],
         ];
+        $this->emitImportCompleted($companyId, $defaultMonth, $defaultYear, $merged);
+
+        return $merged;
+    }
+
+    /**
+     * @param  array{created: int, updated: int, failed: int, skipped?: int}  $result
+     */
+    private function emitImportCompleted(int $companyId, ?int $month, ?int $year, array $result): void
+    {
+        $rowCount = (int) $result['created'] + (int) $result['updated'];
+
+        app(AttendanceAuditService::class)->log(
+            $companyId,
+            'attendance_import',
+            null,
+            'import_completed',
+            null,
+            null,
+            array_filter([
+                'month' => $month,
+                'year' => $year,
+                'row_count' => $rowCount,
+                'processed_count' => $rowCount,
+                'failed_count' => (int) $result['failed'],
+            ], static fn ($v) => $v !== null),
+            (int) $result['failed'] > 0 ? 'failure' : 'success',
+            (int) $result['failed'] > 0 ? 'warning' : 'info',
+        );
     }
 
     /**

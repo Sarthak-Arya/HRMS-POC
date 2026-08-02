@@ -4,6 +4,7 @@ namespace App\Services\Settings;
 
 use App\Enums\Settings\CompanySettingsSection;
 use App\Models\CompanySetting;
+use App\Services\Observability\DomainTelemetry;
 use App\Services\Settings\Validators\CompanySettingsValidator;
 use App\Support\Settings\CompanySettingsDefaults;
 use Illuminate\Support\Arr;
@@ -15,6 +16,7 @@ class CompanySettingsService
     public function __construct(
         private readonly CompanySettingsValidator $validator,
         private readonly CompanySettingsAuditService $auditService,
+        private readonly DomainTelemetry $telemetry,
     ) {}
 
     public function ensureExists(int $companyId): CompanySetting
@@ -64,50 +66,60 @@ class CompanySettingsService
         ?int $actorUserId = null,
         ?string $reason = null,
     ): CompanySetting {
-        $validated = $this->validator->validate($section, $payload, $companyId);
+        try {
+            $validated = $this->validator->validate($section, $payload, $companyId);
 
-        return DB::transaction(function () use ($companyId, $section, $validated, $expectedVersion, $actorUserId, $reason) {
-            $record = CompanySetting::query()
-                ->where('company_id', $companyId)
-                ->lockForUpdate()
-                ->first();
-
-            if (! $record) {
-                $record = $this->ensureExists($companyId);
+            return DB::transaction(function () use ($companyId, $section, $validated, $expectedVersion, $actorUserId, $reason) {
                 $record = CompanySetting::query()
                     ->where('company_id', $companyId)
                     ->lockForUpdate()
-                    ->firstOrFail();
-            }
+                    ->first();
 
-            if ((int) $record->version !== $expectedVersion) {
-                throw ValidationException::withMessages([
-                    'version' => 'Settings were updated by another user. Please refresh and try again.',
+                if (! $record) {
+                    $record = $this->ensureExists($companyId);
+                    $record = CompanySetting::query()
+                        ->where('company_id', $companyId)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+                }
+
+                if ((int) $record->version !== $expectedVersion) {
+                    throw ValidationException::withMessages([
+                        'version' => 'Settings were updated by another user. Please refresh and try again.',
+                    ]);
+                }
+
+                $before = $this->mergeWithDefaults($record->settings_json ?? []);
+                $beforeSection = $before[$section->value] ?? CompanySettingsDefaults::forSection($section);
+
+                $settings = $before;
+                $settings[$section->value] = $validated;
+
+                $record->update([
+                    'settings_json' => $settings,
+                    'version' => $record->version + 1,
                 ]);
-            }
 
-            $before = $this->mergeWithDefaults($record->settings_json ?? []);
-            $beforeSection = $before[$section->value] ?? CompanySettingsDefaults::forSection($section);
+                $this->auditService->log(
+                    $companyId,
+                    $section,
+                    $beforeSection,
+                    $validated,
+                    $actorUserId,
+                    $reason,
+                );
 
-            $settings = $before;
-            $settings[$section->value] = $validated;
+                return $record->refresh();
+            });
+        } catch (\Throwable $e) {
+            $this->telemetry->emit('settings.section.save_failed', 'business', 'failure', [
+                'company.id' => $companyId,
+                'section' => $section->value,
+                'error.type' => $e::class,
+            ], 'error');
 
-            $record->update([
-                'settings_json' => $settings,
-                'version' => $record->version + 1,
-            ]);
-
-            $this->auditService->log(
-                $companyId,
-                $section,
-                $beforeSection,
-                $validated,
-                $actorUserId,
-                $reason,
-            );
-
-            return $record->refresh();
-        });
+            throw $e;
+        }
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Services\Compensation;
 
 use App\Models\CompensationComponent;
 use App\Models\CompensationStructure;
+use App\Services\Observability\DomainTelemetry;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -11,6 +12,7 @@ class CompensationStructureImportService
 {
     public function __construct(
         private readonly CompensationStructureService $structureService,
+        private readonly DomainTelemetry $telemetry,
     ) {
     }
 
@@ -22,6 +24,10 @@ class CompensationStructureImportService
      */
     public function import(int $companyId, array $rows, array $initialErrors = []): array
     {
+        $this->telemetry->emit('compensation.import.started', 'business', 'success', [
+            'company.id' => $companyId,
+        ]);
+
         $errors = $initialErrors;
         $created = 0;
         $failed = 0;
@@ -90,6 +96,19 @@ class CompensationStructureImportService
                 $errors[] = $this->formatError($firstRowNumber, $e->getMessage());
             }
         }
+
+        $failedCount = $failed + count($initialErrors);
+        $this->telemetry->emit(
+            'compensation.import.completed',
+            'business',
+            $failedCount > 0 ? 'failure' : 'success',
+            [
+                'company.id' => $companyId,
+                'processed_count' => $created,
+                'failed_count' => $failedCount,
+            ],
+            $failedCount > 0 ? 'warning' : 'info',
+        );
 
         return [
             'total_groups' => $grouped->count(),

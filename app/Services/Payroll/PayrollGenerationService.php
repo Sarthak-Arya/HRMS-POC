@@ -83,12 +83,14 @@ class PayrollGenerationService
     ): array {
         $this->lifecycle->assertRunEditable($run);
 
+        $employees = $this->readinessService->eligibleEmployees($run, $departmentId, $designationId);
+        $this->emitValidationFailedIfNotReady($run, $employees);
+
         if ($run->status === PayrollRunStatus::DRAFT) {
             $this->runManager->transitionRunStatus($run, PayrollRunStatus::PROCESSING, 'Payroll processing started');
             $run->refresh();
         }
 
-        $employees = $this->readinessService->eligibleEmployees($run, $departmentId, $designationId);
         $stats = ['processed' => 0, 'skipped' => 0, 'failed' => 0, 'skipped_employees' => []];
         $started = microtime(true);
 
@@ -141,12 +143,13 @@ class PayrollGenerationService
     ): Batch {
         $this->lifecycle->assertRunEditable($run);
 
+        $employees = $this->readinessService->eligibleEmployees($run, $departmentId, $designationId);
+        $this->emitValidationFailedIfNotReady($run, $employees);
+
         if (in_array($run->status, [PayrollRunStatus::DRAFT, PayrollRunStatus::COMPLETED], true)) {
             $this->runManager->transitionRunStatus($run, PayrollRunStatus::PROCESSING, 'Payroll batch processing started');
             $run->refresh();
         }
-
-        $employees = $this->readinessService->eligibleEmployees($run, $departmentId, $designationId);
 
         $jobs = $employees->map(fn (Employee $employee) => new ProcessEmployeePayroll(
             $run->id,
@@ -189,6 +192,19 @@ class PayrollGenerationService
                 ], 'error');
             })
             ->dispatch();
+    }
+
+    private function emitValidationFailedIfNotReady(PayrollRun $run, Collection $employees): void
+    {
+        $assessment = $this->readinessService->assess($run, $employees);
+        if ($assessment['is_ready']) {
+            return;
+        }
+
+        $this->telemetry->emit('payroll.run.validation_failed', 'business', 'failure', [
+            'company.id' => $run->company_id,
+            'payroll.run_id' => $run->id,
+        ], 'error');
     }
 
     public function processEmployee(PayrollRun $run, Employee $employee): ?EmployeePayroll

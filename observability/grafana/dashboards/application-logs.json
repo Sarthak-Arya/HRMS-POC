@@ -1,0 +1,227 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Open Kibana Discover",
+      "tooltip": "Full-text log search in Kibana",
+      "type": "link",
+      "url": "http://localhost:5601/app/discover"
+    }
+  ],
+  "panels": [
+    {
+      "datasource": { "type": "elasticsearch", "uid": "elasticsearch" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "alias": "",
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "auto" }, "type": "date_histogram" }],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "*",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "Log events (selected range)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "elasticsearch-security" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "auto" }, "type": "date_histogram" }],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "event.category:security",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "Security events",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "elasticsearch" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "auto" }, "type": "date_histogram" }],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "event.outcome:failure OR event.outcome:denied",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "Failures / denials",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "elasticsearch" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "bucketAggs": [{ "field": "@timestamp", "id": "2", "settings": { "interval": "auto" }, "type": "date_histogram" }],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "event.name:auth.login.*",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "Login events",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "elasticsearch" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "id": 5,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "bucketAggs": [
+            { "field": "event.category", "id": "3", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "20" }, "type": "terms" },
+            { "field": "@timestamp", "id": "2", "settings": { "interval": "auto", "min_doc_count": 0 }, "type": "date_histogram" }
+          ],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "$event_filter",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "Events by category",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "elasticsearch" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "id": 6,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "bucketAggs": [
+            { "field": "event.name", "id": "3", "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "15" }, "type": "terms" },
+            { "field": "@timestamp", "id": "2", "settings": { "interval": "auto", "min_doc_count": 0 }, "type": "date_histogram" }
+          ],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "$event_filter",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "Top event names",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "elasticsearch" },
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 12 },
+      "id": 7,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "metrics": [{ "id": "1", "settings": {}, "type": "logs" }],
+          "query": "$event_filter",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "Live application logs (message / event.name)",
+      "type": "logs"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["payroll", "logs", "elasticsearch"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": "*", "value": "*" },
+        "description": "Lucene filter, e.g. event.name:auth.login.* OR company.id:13",
+        "name": "event_filter",
+        "options": [
+          { "selected": true, "text": "*", "value": "*" },
+          { "selected": false, "text": "event.category:security", "value": "event.category:security" },
+          { "selected": false, "text": "event.category:business", "value": "event.category:business" },
+          { "selected": false, "text": "event.name:auth.login.*", "value": "event.name:auth.login.*" },
+          { "selected": false, "text": "event.outcome:failure OR event.outcome:denied", "value": "event.outcome:failure OR event.outcome:denied" },
+          { "selected": false, "text": "event.name:payroll.*", "value": "event.name:payroll.*" },
+          { "selected": false, "text": "event.name:employee.*", "value": "event.name:employee.*" },
+          { "selected": false, "text": "event.name:attendance.*", "value": "event.name:attendance.*" }
+        ],
+        "query": "*",
+        "skipUrlSync": false,
+        "type": "custom",
+        "label": "Filter"
+      }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Application Logs",
+  "uid": "payroll-application-logs",
+  "version": 1
+}

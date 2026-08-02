@@ -4,6 +4,7 @@ namespace App\Services\Compensation;
 
 use App\Models\CompensationStructure;
 use App\Models\StructureComponent;
+use App\Services\Observability\DomainTelemetry;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -16,6 +17,11 @@ use Illuminate\Validation\ValidationException;
  */
 class CompensationStructureService
 {
+    public function __construct(
+        private readonly DomainTelemetry $telemetry,
+    ) {
+    }
+
     /**
      * List all compensation structures for a specific company.
      *
@@ -45,7 +51,7 @@ class CompensationStructureService
         $validated = $this->validateStructure($companyId, $data);
         $this->validateComponents($components);
 
-        return DB::transaction(function () use ($companyId, $validated, $components) {
+        $structure = DB::transaction(function () use ($companyId, $validated, $components) {
             if (!empty($validated['is_default'])) {
                 $this->clearDefaultFlag($companyId);
             }
@@ -59,6 +65,12 @@ class CompensationStructureService
 
             return $structure->load('structureComponents.component');
         });
+
+        $this->telemetry->emit('compensation.structure.changed', 'audit', 'success', [
+            'company.id' => $companyId,
+        ]);
+
+        return $structure;
     }
 
     /**
@@ -77,7 +89,7 @@ class CompensationStructureService
         $validated = $this->validateStructure($companyId, $data, $structureId);
         $this->validateComponents($components);
 
-        return DB::transaction(function () use ($companyId, $structure, $validated, $components) {
+        $structure = DB::transaction(function () use ($companyId, $structure, $validated, $components) {
             if (!empty($validated['is_default'])) {
                 $this->clearDefaultFlag($companyId, $structure->id);
             }
@@ -87,6 +99,12 @@ class CompensationStructureService
 
             return $structure->fresh(['structureComponents.component']);
         });
+
+        $this->telemetry->emit('compensation.structure.changed', 'audit', 'success', [
+            'company.id' => $companyId,
+        ]);
+
+        return $structure;
     }
 
     /**
@@ -100,6 +118,10 @@ class CompensationStructureService
     {
         $structure = CompensationStructure::where('company_id', $companyId)->findOrFail($structureId);
         $structure->delete();
+
+        $this->telemetry->emit('compensation.structure.changed', 'audit', 'success', [
+            'company.id' => $companyId,
+        ]);
     }
 
     /**

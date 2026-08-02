@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Models\Designation;
 use App\Models\Employee;
 use App\Models\Location;
+use App\Services\Observability\DomainTelemetry;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
@@ -31,6 +32,11 @@ class EmployeeService
 
     /** @var array<string,int> Cache for location IDs */
     private array $locationCache = [];
+
+    public function __construct(
+        private readonly DomainTelemetry $telemetry,
+    ) {
+    }
 
     /**
      * Create or update an employee from form data.
@@ -75,12 +81,30 @@ class EmployeeService
 
         if ($employeeId) {
             $employee = Employee::where('company_id', $companyId)->findOrFail($employeeId);
+            $fromStatus = $employee->dol ? 'inactive' : 'active';
+            $toStatus = ($payload['dol'] ?? null) ? 'inactive' : 'active';
             $employee->update($payload);
+
+            $this->telemetry->emit('employee.updated', 'business', 'success', [
+                'company.id' => $companyId,
+            ]);
+
+            if ($fromStatus !== $toStatus) {
+                $this->telemetry->emit('employee.status_changed', 'business', 'success', [
+                    'company.id' => $companyId,
+                    'from_status' => $fromStatus,
+                    'to_status' => $toStatus,
+                ]);
+            }
 
             return ['action' => 'updated', 'employee' => $employee->fresh(['department', 'designation', 'location'])];
         }
 
         $employee = Employee::create($payload);
+
+        $this->telemetry->emit('employee.created', 'business', 'success', [
+            'company.id' => $companyId,
+        ]);
 
         return ['action' => 'created', 'employee' => $employee->load(['department', 'designation', 'location'])];
     }
@@ -189,10 +213,23 @@ class EmployeeService
         ];
 
         try {
+            $fromStatus = $existingEmployee
+                ? ($existingEmployee->dol ? 'inactive' : 'active')
+                : null;
+            $toStatus = ($payload['dol'] ?? null) ? 'inactive' : 'active';
+
             if ($existingEmployee) {
                 $existingEmployee->update($payload);
             } else {
                 Employee::create($payload);
+            }
+
+            if ($fromStatus !== null && $fromStatus !== $toStatus) {
+                $this->telemetry->emit('employee.status_changed', 'business', 'success', [
+                    'company.id' => $companyId,
+                    'from_status' => $fromStatus,
+                    'to_status' => $toStatus,
+                ]);
             }
 
             return ['success' => true];
@@ -207,13 +244,10 @@ class EmployeeService
                 $message = 'Invalid department/designation/location reference.';
             }
 
-            Log::error('Employee upsert SQL error', [
-                'company_id' => $companyId,
-                'sqlstate' => $sqlState,
-                'error_code' => $errorCode,
-                'exception_message' => $e->getMessage(),
-                'employee_code' => $employeeCode,
-            ]);
+            $this->telemetry->emit('employee.save.failed', 'business', 'failure', [
+                'company.id' => $companyId,
+                'error.type' => QueryException::class,
+            ], 'error');
 
             return ['success' => false, 'field' => 'database', 'error' => $message];
         }

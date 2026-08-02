@@ -1,0 +1,1 @@
+{"sessionId":"3bd8a4","runId":"pre-fix","hypothesisId":"E","location":"PayrollRunDetail.php:processPayroll","message":"calculate payroll dispatched","data":{"run_id":6,"company_id":"11","batch_id":"a2626daa-13e1-405c-adaf-c740fa9e77ce","total_jobs":1},"timestamp":1785436303632}

@@ -15,6 +15,7 @@ class CompOffService
     public function __construct(
         private readonly HolidayCalendarService $holidayCalendarService,
         private readonly WeeklyOffPatternService $weeklyOffPatternService,
+        private readonly AttendanceAuditService $auditService,
     ) {}
 
     public function availableBalance(Employee $employee): float
@@ -74,8 +75,9 @@ class CompOffService
         float $days = 1.0,
         ?int $attendanceId = null,
         ?string $reason = null,
+        bool $emitTelemetry = true,
     ): EmployeeCompOffLedger {
-        return EmployeeCompOffLedger::create([
+        $entry = EmployeeCompOffLedger::create([
             'employee_id' => $employee->id,
             'company_id' => $employee->company_id,
             'reference_date' => $date->toDateString(),
@@ -84,11 +86,27 @@ class CompOffService
             'reason' => $reason ?? 'Worked on off-day/holiday',
             'attendance_id' => $attendanceId,
         ]);
+
+        if ($emitTelemetry) {
+            $this->auditService->log(
+                (int) $employee->company_id,
+                'employee_comp_off_ledger',
+                $entry->id,
+                'compoff_changed',
+            );
+        }
+
+        return $entry;
     }
 
-    public function debitCompOff(Employee $employee, float $days, Carbon $date, ?string $reason = null): void
-    {
-        EmployeeCompOffLedger::create([
+    public function debitCompOff(
+        Employee $employee,
+        float $days,
+        Carbon $date,
+        ?string $reason = null,
+        bool $emitTelemetry = true,
+    ): void {
+        $entry = EmployeeCompOffLedger::create([
             'employee_id' => $employee->id,
             'company_id' => $employee->company_id,
             'reference_date' => $date->toDateString(),
@@ -96,6 +114,15 @@ class CompOffService
             'days' => $days,
             'reason' => $reason ?? 'Comp-off consumed',
         ]);
+
+        if ($emitTelemetry) {
+            $this->auditService->log(
+                (int) $employee->company_id,
+                'employee_comp_off_ledger',
+                $entry->id,
+                'compoff_changed',
+            );
+        }
     }
 
     /**
@@ -133,8 +160,25 @@ class CompOffService
                 $record->attendance_date,
                 1.0,
                 $record->id,
+                null,
+                false,
             );
             $credited++;
+        }
+
+        if ($credited > 0) {
+            $this->auditService->log(
+                (int) $employee->company_id,
+                'employee_comp_off_ledger',
+                null,
+                'compoff_changed',
+                null,
+                null,
+                [
+                    'processed_count' => $credited,
+                    'row_count' => $credited,
+                ],
+            );
         }
 
         return $credited;

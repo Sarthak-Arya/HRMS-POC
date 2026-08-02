@@ -45,12 +45,12 @@ Out of scope for this doc (later): AI assistant, infra/health, pure platform met
 
 | Action | Event name | Category | Outcome | Context (safe) | Status |
 |--------|------------|----------|---------|----------------|--------|
-| Company created | `company.created` | audit | success | `company.id` | Todo |
-| Company updated | `company.updated` | audit | success | `company.id` | Todo |
-| Company create/update failed | `company.save.failed` | business | failure | `company.id` (if any), `error.type` | Todo |
-| Company Excel import finished | `company.import.completed` | business | success/failure | `processed_count`, `failed_count` | Todo |
-| Org structure changed (dept/designation) | `settings.organization.changed` | audit | success | `company.id`, `section` | Todo (catalogue exists) |
-| Setup step completed | `company.setup.step_completed` | business | success | `company.id`, `status` (step key) | Todo |
+| Company created | `company.created` | audit | success | `company.id` | Done |
+| Company updated | `company.updated` | audit | success | `company.id` | Done |
+| Company create/update failed | `company.save.failed` | business | failure | `company.id` (if any), `error.type` | Done |
+| Company Excel import finished | `company.import.completed` | business | success/failure | `processed_count`, `failed_count` | Done |
+| Org structure changed (dept/designation) | `settings.organization.changed` | audit | success | `company.id`, `section` | Done |
+| Setup step completed | `company.setup.step_completed` | business | success | `company.id`, `status` (step key) | Todo (no write path yet) |
 
 **Do not log:** company address free text, GST/PAN values, contact emails/phones from import rows.
 
@@ -66,17 +66,17 @@ Out of scope for this doc (later): AI assistant, infra/health, pure platform met
 
 | Action | Event name | Category | Outcome | Context (safe) | Status |
 |--------|------------|----------|---------|----------------|--------|
-| Employee created | `employee.created` | business | success | `company.id` | Todo |
-| Employee updated | `employee.updated` | business | success | `company.id` | Todo |
-| Employee save failed | `employee.save.failed` | business | failure | `company.id`, `error.type` | Todo (replace noisy `Log::error` with PII) |
-| Import started | `employee.import.started` | business | success | `company.id` | Todo |
-| Import completed | `employee.import.completed` | business | success/failure | `company.id`, `processed_count`, `failed_count`, `skipped_count` | Todo |
-| Import template downloaded | `employee.template.downloaded` | audit | success | `company.id`, `artifact_type` | Todo |
-| Employee deactivated / exited | `employee.status_changed` | business | success | `company.id`, `from_status`, `to_status` | Todo |
+| Employee created | `employee.created` | business | success | `company.id` | Done |
+| Employee updated | `employee.updated` | business | success | `company.id` | Done |
+| Employee save failed | `employee.save.failed` | business | failure | `company.id`, `error.type` | Done |
+| Import started | `employee.import.started` | business | success | `company.id` | Done |
+| Import completed | `employee.import.completed` | business | success/failure | `company.id`, `processed_count`, `failed_count`, `skipped_count` | Done |
+| Import template downloaded | `employee.template.downloaded` | audit | success | `company.id`, `artifact_type` | Done |
+| Employee deactivated / exited | `employee.status_changed` | business | success | `company.id`, `from_status`, `to_status` | Done |
 
 **Do not log:** employee name, email, phone, bank account, Aadhaar/PAN, full import row JSON.
 
-**Today:** `AddEmployeeDetails` / `EmployeeService` still use ad-hoc `Log::info` / `Log::error`. When you touch imports, replace those with the events above.
+**Today:** `EmployeeService` / `AddEmployeeDetails` emit structured `DomainTelemetry` events (IDs/counts only).
 
 **Pattern:**
 
@@ -103,12 +103,12 @@ $this->telemetry->emit('employee.import.completed', 'business', $failed > 0 ? 'f
 | Monthly summary saved/created | `attendance.monthly.saved` | business | success | `company.id`, month/year | Partial (via audit) |
 | Month locked | `attendance.month.locked` | business | success | `company.id`, month/year | Partial (via audit) |
 | Policy created/updated/deactivated | `attendance.policy.changed` | audit | success | `company.id` | Partial (via audit) |
-| Policy assigned to scope | `attendance.policy.assigned` | audit | success | `company.id` | Todo |
-| Attendance Excel import finished | `attendance.import.completed` | business | success/failure | `company.id`, month/year, counts | Todo |
-| Comp-off granted/used/adjusted | `attendance.compoff.changed` | business | success | `company.id` | Todo |
-| Leave exception rule changed | `attendance.leave_exception.changed` | business | success | `company.id` | Todo |
-| Leave type created/updated | `attendance.leave_type.changed` | audit | success | `company.id` | Todo |
-| Lock/reconcile failed | `attendance.month.lock_failed` | business | failure | `company.id`, month/year, `error.type` | Todo |
+| Policy assigned to scope | `attendance.policy.assigned` | audit | success | `company.id` | Done |
+| Attendance Excel import finished | `attendance.import.completed` | business | success/failure | `company.id`, month/year, counts | Done |
+| Comp-off granted/used/adjusted | `attendance.compoff.changed` | business | success | `company.id` | Done |
+| Leave exception rule changed | `attendance.leave_exception.changed` | business | success | `company.id` | Done |
+| Leave type created/updated | `attendance.leave_type.changed` | audit | success | `company.id` | Done |
+| Lock/reconcile failed | `attendance.month.lock_failed` | business | failure | `company.id`, month/year, `error.type` | Done |
 
 **How this module works:** Prefer calling `AttendanceAuditService::log(...)` for mutations that need MySQL audit. That service already emits matching telemetry for known actions. For **new** actions, extend its `match` map and the event catalogue.
 
@@ -126,18 +126,18 @@ $this->telemetry->emit('employee.import.completed', 'business', $failed > 0 ? 'f
 
 | Action | Event name | Category | Outcome | Context (safe) | Status |
 |--------|------------|----------|---------|----------------|--------|
-| Component created/updated | `compensation.component.changed` | audit | success | `company.id`, `status` (component type/code if non-PII) | Todo |
-| Structure created/updated | `compensation.structure.changed` | audit | success | `company.id` | Todo |
-| Employee compensation assigned/changed | `compensation.assignment.changed` | audit | success | `company.id` | Todo |
-| Override applied | `compensation.override.changed` | audit | success | `company.id` | Todo |
-| Import started | `compensation.import.started` | business | success | `company.id` | Todo |
-| Import completed | `compensation.import.completed` | business | success/failure | `company.id`, counts | Todo |
-| Import failed hard | `compensation.import.failed` | business | failure | `company.id`, `error.type` | Todo |
-| Statutory calculation failed | `compensation.statutory.failed` | business | failure | `company.id`, `error.type` | Todo |
+| Component created/updated | `compensation.component.changed` | audit | success | `company.id`, `status` (component type/code if non-PII) | Done |
+| Structure created/updated | `compensation.structure.changed` | audit | success | `company.id` | Done |
+| Employee compensation assigned/changed | `compensation.assignment.changed` | audit | success | `company.id` | Done |
+| Override applied | `compensation.override.changed` | audit | success | `company.id` | Done |
+| Import started | `compensation.import.started` | business | success | `company.id` | Done |
+| Import completed | `compensation.import.completed` | business | success/failure | `company.id`, counts | Done |
+| Import failed hard | `compensation.import.failed` | business | failure | `company.id`, `error.type` | Done |
+| Statutory calculation failed | `compensation.statutory.failed` | business | failure | `company.id`, `error.type` | Todo (no throw site in calculator) |
 
 **Do not log:** salary amounts, CTC, component amounts, PF/ESI wage figures.
 
-**Today:** Almost no `DomainTelemetry` in compensation services — this is a high-priority intern backlog when working on Compensation Hub.
+**Today:** Compensation services emit structured `DomainTelemetry` on component/structure/assignment/override/import mutations.
 
 ---
 
@@ -156,9 +156,9 @@ $this->telemetry->emit('employee.import.completed', 'business', $failed > 0 ? 'f
 | Employee payroll status | `payroll.employee.status_changed` | business | success | run id, statuses | Done |
 | Batch started/completed/failed | `queue.batch.*` | business | * | `job.batch_id`, counts | Done |
 | Per-employee job failed | `payroll.job.failed` | business | failure | `payroll.run_id`, `error.type` | Done |
-| Readiness/validation failed before run | `payroll.run.validation_failed` | business | failure | `company.id`, `payroll.run_id` | Todo |
-| Run cancelled | `payroll.run.cancelled` | business | success | `payroll.run_id` | Todo |
-| Adjustment applied | `compensation.adjustment.applied` or `payroll.adjustment.applied` | business | success | `payroll.run_id` | Todo |
+| Readiness/validation failed before run | `payroll.run.validation_failed` | business | failure | `company.id`, `payroll.run_id` | Done |
+| Run cancelled | `payroll.run.cancelled` | business | success | `payroll.run_id` | Done |
+| Adjustment applied | `compensation.adjustment.applied` or `payroll.adjustment.applied` | business | success | `payroll.run_id` | Done |
 | Payslip download | `export.payslip.downloaded` | audit | success/failure | run id, `row_count` | Done |
 | Bulk payslip download | `export.payslip_bulk.downloaded` | audit | success/failure | run id, `row_count` | Done |
 | Salary sheet download | `export.salary_sheet.downloaded` | audit | success/failure | run id, `format` | Done |
@@ -177,7 +177,7 @@ $this->telemetry->emit('employee.import.completed', 'business', $failed > 0 ? 'f
 
 | Action | Event name | Category | Outcome | Context (safe) | Status |
 |--------|------------|----------|---------|----------------|--------|
-| Template created/updated/deleted | `report.template.changed` | audit | success | `company.id`, `artifact_type` | Partial (DB audit via `ReportAuditLogger`; add emit if missing) |
+| Template created/updated/deleted | `report.template.changed` | audit | success | `company.id`, `artifact_type` | Done (via `ReportAuditLogger`) |
 | Preview requested | `report.preview.requested` | business | success | `company.id`, `artifact_type` | Done |
 | Export started | `report.export.started` | business | success | `company.id`, `format` | Done |
 | Export completed/failed | `report.export.completed` | business | success/failure | `duration_ms`, `format` | Done |
@@ -197,7 +197,7 @@ $this->telemetry->emit('employee.import.completed', 'business', $failed > 0 ? 'f
 | Action | Event name | Category | Outcome | Context (safe) | Status |
 |--------|------------|----------|---------|----------------|--------|
 | Section saved | `settings.section.changed` | audit | success | `company.id`, `section` | Done (via audit service) |
-| Save failed | `settings.section.save_failed` | business | failure | `company.id`, `section`, `error.type` | Todo |
+| Save failed | `settings.section.save_failed` | business | failure | `company.id`, `section`, `error.type` | Done |
 
 **Do not log:** before/after setting JSON in Elastic (that stays in MySQL `company_settings_audit_logs`). Telemetry = section name + company id only.
 
@@ -220,14 +220,11 @@ If you add signup, logout, or password-reset flows, add the catalogue events (`a
 
 ## Suggested intern backlog (priority)
 
-Work in this order when asked to “add logs to HRMS”:
+Most core HRMS Todo events above are now Done. Remaining optional follow-ups:
 
-1. **Employees** — import started/completed + save failed (replace unsafe `Log::` calls)  
-2. **Compensation** — component/structure/assignment changes + import summaries  
-3. **Company** — create/update + import summary  
-4. **Attendance gaps** — import completed, policy assignment, comp-off, leave exception  
-5. **Payroll gaps** — validation failed, cancel, adjustments  
-6. **Reports** — confirm template change emits structured event  
+1. **`company.setup.step_completed`** — needs a write-side hook when setup progress flips  
+2. **`compensation.statutory.failed`** — emit if/when statutory calculator gains a failure path  
+3. Auth extras (`auth.logout`, password-reset) if those flows are productized  
 
 ---
 

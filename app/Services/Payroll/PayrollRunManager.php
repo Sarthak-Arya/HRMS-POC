@@ -56,6 +56,13 @@ class PayrollRunManager
                 'to_status' => $target->value,
             ]);
 
+            if ($oldStatus === PayrollRunStatus::PROCESSING && $target === PayrollRunStatus::DRAFT) {
+                $this->telemetry->emit('payroll.run.cancelled', 'business', 'success', [
+                    'company.id' => $run->company_id,
+                    'payroll.run_id' => $run->id,
+                ]);
+            }
+
             return $run->fresh();
         });
     }

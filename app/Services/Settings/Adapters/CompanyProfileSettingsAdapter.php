@@ -4,12 +4,14 @@ namespace App\Services\Settings\Adapters;
 
 use App\Enums\Settings\CompanySettingsSection;
 use App\Models\Company;
+use App\Services\Observability\DomainTelemetry;
 use App\Services\Settings\CompanySettingsService;
 
 class CompanyProfileSettingsAdapter
 {
     public function __construct(
         private readonly CompanySettingsService $settingsService,
+        private readonly DomainTelemetry $telemetry,
     ) {}
 
     /**
@@ -103,6 +105,10 @@ class CompanyProfileSettingsAdapter
                 : ($companyFields['address'] ?? $company->company_address),
             'is_esi' => (bool) ($companyFields['isEsi'] ?? false),
             'is_pf' => (bool) ($companyFields['isPf'] ?? false),
+        ]);
+
+        $this->telemetry->emit('company.updated', 'audit', 'success', [
+            'company.id' => $companyId,
         ]);
 
         $this->settingsService->updateSection(

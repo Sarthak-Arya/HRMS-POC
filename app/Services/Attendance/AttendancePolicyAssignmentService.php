@@ -47,7 +47,7 @@ class AttendancePolicyAssignmentService
 
         $this->closeOpenAssignments($companyId, $scopeType, $scopeId, Carbon::parse($validated['effective_from']));
 
-        return AttendancePolicyAssignment::create([
+        $assignment = AttendancePolicyAssignment::create([
             'company_id' => $companyId,
             'scope_type' => $scopeType->value,
             'scope_id' => $scopeType === AttendanceScopeType::COMPANY ? null : $scopeId,
@@ -55,6 +55,17 @@ class AttendancePolicyAssignmentService
             'effective_from' => $validated['effective_from'],
             'effective_to' => $validated['effective_to'] ?? null,
         ]);
+
+        app(AttendanceAuditService::class)->log(
+            $companyId,
+            'attendance_policy_assignment',
+            $assignment->id,
+            'policy_assigned',
+            null,
+            $assignment->only(['id', 'policy_id', 'scope_type', 'scope_id', 'effective_from', 'effective_to']),
+        );
+
+        return $assignment;
     }
 
     /**
@@ -97,7 +108,18 @@ class AttendancePolicyAssignmentService
 
     public function delete(int $companyId, int $assignmentId): void
     {
-        AttendancePolicyAssignment::where('company_id', $companyId)->findOrFail($assignmentId)->delete();
+        $assignment = AttendancePolicyAssignment::where('company_id', $companyId)->findOrFail($assignmentId);
+        $before = $assignment->only(['id', 'policy_id', 'scope_type', 'scope_id', 'effective_from', 'effective_to']);
+        $assignment->delete();
+
+        app(AttendanceAuditService::class)->log(
+            $companyId,
+            'attendance_policy_assignment',
+            $assignmentId,
+            'policy_assigned',
+            $before,
+            null,
+        );
     }
 
     /**

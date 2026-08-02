@@ -85,6 +85,8 @@ services:
       - alertmanager
     networks:
       - observability
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   alertmanager:
     image: prom/alertmanager:v0.27.0

@@ -5,6 +5,7 @@ namespace App\Services\Compensation;
 use App\Enums\Compensation\CompensationScopeType;
 use App\Models\CompensationStructureAssignment;
 use App\Models\Employee;
+use App\Services\Observability\DomainTelemetry;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
@@ -12,6 +13,11 @@ use Illuminate\Validation\ValidationException;
 
 class CompensationAssignmentService
 {
+    public function __construct(
+        private readonly DomainTelemetry $telemetry,
+    ) {
+    }
+
     /**
      * @return Collection<int, CompensationStructureAssignment>
      */
@@ -38,7 +44,7 @@ class CompensationAssignmentService
 
         $this->closeOpenAssignments($companyId, $scopeType, $scopeId, Carbon::parse($validated['effective_from']));
 
-        return CompensationStructureAssignment::create([
+        $assignment = CompensationStructureAssignment::create([
             'company_id' => $companyId,
             'scope_type' => $scopeType->value,
             'scope_id' => $scopeType === CompensationScopeType::COMPANY ? null : $scopeId,
@@ -46,6 +52,12 @@ class CompensationAssignmentService
             'effective_from' => $validated['effective_from'],
             'effective_to' => $validated['effective_to'] ?? null,
         ]);
+
+        $this->telemetry->emit('compensation.assignment.changed', 'audit', 'success', [
+            'company.id' => $companyId,
+        ]);
+
+        return $assignment;
     }
 
     /**
@@ -89,6 +101,10 @@ class CompensationAssignmentService
     public function delete(int $companyId, int $assignmentId): void
     {
         CompensationStructureAssignment::where('company_id', $companyId)->findOrFail($assignmentId)->delete();
+
+        $this->telemetry->emit('compensation.assignment.changed', 'audit', 'success', [
+            'company.id' => $companyId,
+        ]);
     }
 
     /**

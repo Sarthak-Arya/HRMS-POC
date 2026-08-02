@@ -2,21 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Observability\DomainTelemetry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Log;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Illuminate\Support\Facades\Response;
 
 class EmployeeTemplateController extends Controller
 {
-    public function downloadTemplate()
+    public function downloadTemplate(DomainTelemetry $telemetry)
     {
         try {
-            // Log the download action
-            Log::info('Employee template download requested by user: ' . auth()->id());
-
             // Get all column names from employees table
             $columns = Schema::getColumnListing('employees');
             
@@ -165,12 +162,19 @@ class EmployeeTemplateController extends Controller
             $writer->save('php://output');
             $content = ob_get_clean();
 
-            Log::info('Employee template downloaded successfully. File: ' . $filename);
+            $companyId = session('company_id') ?? session('companyId') ?? request()->route('company_id');
+            $telemetry->emit('employee.template.downloaded', 'audit', 'success', array_filter([
+                'company.id' => $companyId !== null ? (int) $companyId : null,
+                'artifact_type' => 'employee_template',
+            ], static fn ($v) => $v !== null));
 
             return Response::make($content, 200, $headers);
 
         } catch (\Exception $e) {
-            Log::error('Error generating employee template: ' . $e->getMessage());
+            $telemetry->emit('employee.template.downloaded', 'audit', 'failure', [
+                'error.type' => $e::class,
+                'artifact_type' => 'employee_template',
+            ], 'error');
             return back()->with('error', 'Failed to generate template. Please try again.');
         }
     }

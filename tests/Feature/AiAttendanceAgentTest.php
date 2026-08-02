@@ -108,7 +108,8 @@ class AiAttendanceAgentTest extends TestCase
             'month' => 6,
             'year' => 2026,
             'total_days' => 30,
-            'worked_days' => 29,
+            'working_days' => 26,
+            'worked_days' => 26,
         ]);
 
         $summary = MonthlyAttendance::query()
@@ -148,9 +149,11 @@ class AiAttendanceAgentTest extends TestCase
 
         $this->assertTrue($result['success']);
         $this->assertSame('updated', $result['action']);
+        // Paid CL does not reduce worked_days under fixed_26 company policy.
         $this->assertDatabaseHas('employee_attendance_summaries', [
             'employee_id' => $this->employee->id,
-            'worked_days' => 28,
+            'working_days' => 26,
+            'worked_days' => 26,
         ]);
 
         $summary = MonthlyAttendance::query()

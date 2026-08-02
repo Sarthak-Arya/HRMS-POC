@@ -7,6 +7,7 @@ use App\Models\CompanySetting;
 use App\Models\Department;
 use App\Models\Designation;
 use App\Models\Location;
+use App\Services\Observability\DomainTelemetry;
 use App\Support\Settings\CompanySettingsDefaults;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,11 @@ use Illuminate\Validation\ValidationException;
 
 class OrganizationStructureService
 {
+    public function __construct(
+        private readonly DomainTelemetry $telemetry,
+    ) {
+    }
+
     /**
      * @return Collection<int, Department>
      */
@@ -66,10 +72,14 @@ class OrganizationStructureService
             }
         }
 
-        return Department::create([
+        $department = Department::create([
             'company_id' => $companyId,
             'department_name' => $name,
         ]);
+
+        $this->emitOrganizationChanged($companyId, 'department');
+
+        return $department;
     }
 
     public function updateDepartment(int $companyId, int $departmentId, string $name): Department
@@ -82,6 +92,8 @@ class OrganizationStructureService
         }
 
         $department->update(['department_name' => $name]);
+
+        $this->emitOrganizationChanged($companyId, 'department');
 
         return $department->refresh();
     }
@@ -97,6 +109,8 @@ class OrganizationStructureService
         }
 
         $department->delete();
+
+        $this->emitOrganizationChanged($companyId, 'department');
     }
 
     public function createDesignation(int $companyId, string $name): Designation
@@ -106,10 +120,14 @@ class OrganizationStructureService
             throw ValidationException::withMessages(['name' => 'Designation name is required.']);
         }
 
-        return Designation::create([
+        $designation = Designation::create([
             'company_id' => $companyId,
             'designation_name' => $name,
         ]);
+
+        $this->emitOrganizationChanged($companyId, 'designation');
+
+        return $designation;
     }
 
     public function updateDesignation(int $companyId, int $designationId, string $name): Designation
@@ -122,6 +140,8 @@ class OrganizationStructureService
         }
 
         $designation->update(['designation_name' => $name]);
+
+        $this->emitOrganizationChanged($companyId, 'designation');
 
         return $designation->refresh();
     }
@@ -137,6 +157,8 @@ class OrganizationStructureService
         }
 
         $designation->delete();
+
+        $this->emitOrganizationChanged($companyId, 'designation');
     }
 
     /**
@@ -149,7 +171,7 @@ class OrganizationStructureService
             throw ValidationException::withMessages(['location_name' => 'Location name is required.']);
         }
 
-        return Location::create([
+        $location = Location::create([
             'company_id' => $companyId,
             'location_name' => $name,
             'location_code' => $payload['location_code'] ?? null,
@@ -161,6 +183,10 @@ class OrganizationStructureService
             'location_phone' => $payload['location_phone'] ?? null,
             'location_email' => $payload['location_email'] ?? null,
         ]);
+
+        $this->emitOrganizationChanged($companyId, 'location');
+
+        return $location;
     }
 
     /**
@@ -187,6 +213,8 @@ class OrganizationStructureService
             'location_email' => $payload['location_email'] ?? null,
         ]);
 
+        $this->emitOrganizationChanged($companyId, 'location');
+
         return $location->refresh();
     }
 
@@ -201,6 +229,16 @@ class OrganizationStructureService
         }
 
         $location->delete();
+
+        $this->emitOrganizationChanged($companyId, 'location');
+    }
+
+    private function emitOrganizationChanged(int $companyId, string $section): void
+    {
+        $this->telemetry->emit('settings.organization.changed', 'audit', 'success', [
+            'company.id' => $companyId,
+            'section' => $section,
+        ]);
     }
 
     private function findDepartment(int $companyId, int $departmentId): Department

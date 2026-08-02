@@ -16,6 +16,7 @@ use App\Services\Compensation\CompensationOverrideService;
 use App\Services\Compensation\CompensationResolver;
 use App\Services\Compensation\CompensationStructureImportService;
 use App\Services\Compensation\CompensationStructureService;
+use App\Services\Observability\DomainTelemetry;
 use App\Services\Settings\Adapters\CompensationSettingsAdapter;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -510,7 +511,7 @@ class CompensationHub extends Component
         return Excel::download(new CompensationStructureTemplateExport(), 'compensation_structure_template.xlsx');
     }
 
-    public function importStructuresFromExcel(): void
+    public function importStructuresFromExcel(DomainTelemetry $telemetry): void
     {
         if (! $this->canManage()) {
             return;
@@ -544,6 +545,10 @@ class CompensationHub extends Component
 
             $this->reset('structureImportFile');
         } catch (\Throwable $e) {
+            $telemetry->emit('compensation.import.failed', 'business', 'failure', [
+                'company.id' => (int) $this->companyId,
+                'error.type' => $e::class,
+            ], 'error');
             $this->structureImportError = 'Import failed: ' . $e->getMessage();
         } finally {
             $this->isImportingStructures = false;

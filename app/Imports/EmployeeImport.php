@@ -146,7 +146,7 @@ class EmployeeImport implements ToCollection, WithHeadingRow, WithChunkReading
                 Log::error('Employee import row failed', [
                     'row' => $this->rowNumber,
                     'company_id' => $this->companyId,
-                    'error' => $e->getMessage(),
+                    'error.type' => $e::class,
                 ]);
             }
         }

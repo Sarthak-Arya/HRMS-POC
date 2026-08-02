@@ -6,10 +6,11 @@ use Livewire\Component;
 use App\Models\Company;
 use App\Imports\CompanyImport;
 use App\Enums\Settings\CompanySettingsSection;
+use App\Services\Observability\DomainTelemetry;
 use App\Services\Settings\CompanySettingsService;
 use Livewire\WithFileUploads;
 use Maatwebsite\Excel\Facades\Excel;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Collection;
 
 class AddCompanyDetails extends Component
 {
@@ -58,15 +59,15 @@ class AddCompanyDetails extends Component
 
     public function validateForm(): void
     {
-        Log::info(message: "The new company details are being validated");
         $this->validate();
 
         $this->showConfirmPopup = true;
     }
 
-    public function save(): void
+    public function save(DomainTelemetry $telemetry): void
     {
-        Log::info(message: "The new company details are being saved");
+        $companyId = null;
+
         try {
             $this->validate();
 
@@ -78,6 +79,11 @@ class AddCompanyDetails extends Component
                 'is_pf' => $this->is_pf,
                 'company_address' => $this->address,
                 'b2b_firm_id' => $user?->b2b_firm_id,
+            ]);
+            $companyId = (int) $company->id;
+
+            $telemetry->emit('company.created', 'audit', 'success', [
+                'company.id' => $companyId,
             ]);
 
             // First company for a pure B2C user becomes their scoped company.
@@ -116,32 +122,68 @@ class AddCompanyDetails extends Component
 
             session()->put('companyId', (string) $company->id);
             $this->showConfirmPopup = false;
-            Log::info(message: 'Company details saved successfully.');
 
             $this->redirect(route('getting-started', ['company_id' => $company->id]));
 
             return;
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Illuminate\Database\QueryException $e) {
-            Log::error(message: 'Database error: ' . $e->getMessage());
+            $context = [
+                'error.type' => $e::class,
+            ];
+            if ($companyId !== null) {
+                $context['company.id'] = $companyId;
+            }
+            $telemetry->emit('company.save.failed', 'business', 'failure', $context, 'error');
             $this->alertMessage = 'Company details not saved successfully due to a database error.';
             $this->alertType = 'error';
         } catch (\Exception $e) {
-            Log::error(message: 'Error saving company details: ' . $e->getMessage());
+            $context = [
+                'error.type' => $e::class,
+            ];
+            if ($companyId !== null) {
+                $context['company.id'] = $companyId;
+            }
+            $telemetry->emit('company.save.failed', 'business', 'failure', $context, 'error');
             $this->alertMessage = 'Company details not saved successfully.';
             $this->alertType = 'error';
         }
     }
 
-    public function import()
+    public function import(DomainTelemetry $telemetry)
     {
         $this->validate([
             'file' => 'required|file|mimes:csv,xlsx|max:2048',
         ]);
 
         $collection = Excel::toCollection(new CompanyImport, $this->file);
-        Log::info(message: "The collection is: " . json_encode($collection));
+        $rowCount = $this->countImportRows($collection);
 
         $companyImport = new CompanyImport();
         $companyImport->collection($collection);
+
+        $telemetry->emit('company.import.completed', 'business', 'success', [
+            'processed_count' => $rowCount,
+            'failed_count' => 0,
+        ]);
+    }
+
+    /**
+     * @param  Collection<int, mixed>  $collection
+     */
+    private function countImportRows(Collection $collection): int
+    {
+        $count = 0;
+
+        foreach ($collection as $sheetOrRow) {
+            if ($sheetOrRow instanceof Collection) {
+                $count += $sheetOrRow->count();
+            } else {
+                $count++;
+            }
+        }
+
+        return $count;
     }
 }

@@ -185,7 +185,7 @@ class UpsertAttendanceTool implements AiTool
     {
         return [
             'name' => $this->name(),
-            'description' => 'Add or update monthly attendance for one employee. Creates a new record or updates an existing one for the given month/year. worked_days is auto-calculated from total_days minus leaves.',
+            'description' => 'Add or update monthly attendance for one employee. Creates a new record or updates an existing one for the given month/year. worked_days is auto-calculated from the company attendance policy working-days basis minus LOP/ESI/holidays (paid leave does not reduce worked_days).',
             'parameters' => [
                 'type' => 'object',
                 'properties' => [

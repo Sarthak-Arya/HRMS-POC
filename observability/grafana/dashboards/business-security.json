@@ -3,23 +3,79 @@
   "editable": true,
   "panels": [
     {
-      "type": "timeseries",
-      "title": "Payroll batch failures",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "type": "stat",
+      "title": "Business events (15m)",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "targets": [
         {
-          "expr": "sum(rate(payroll_batch_failed_total[5m]))",
+          "expr": "sum(increase(payroll_business_events_total[15m])) or vector(0)",
+          "legendFormat": "events"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "decimals": 0 }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Security events (15m)",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(increase(payroll_security_events_total[15m])) or vector(0)",
+          "legendFormat": "events"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "decimals": 0 }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "HTTP requests (15m)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(increase(payroll_http_requests_total[15m])) or vector(0)",
+          "legendFormat": "requests"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "decimals": 0 }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Batch failures (15m)",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(increase(payroll_batch_failed_total[15m])) or vector(0)",
+          "legendFormat": "failures"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "decimals": 0 }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Payroll batch failures",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(payroll_batch_failed_total[5m])) or vector(0)",
           "legendFormat": "failures/s"
         }
       ]
     },
     {
       "type": "timeseries",
-      "title": "Payroll events",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "title": "Business events by name",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
       "targets": [
         {
-          "expr": "sum by (event_name) (rate(payroll_business_events_total{event_name=~\"payroll\\\\..*\"}[5m]))",
+          "expr": "sum by (event_name) (rate(payroll_business_events_total[5m]))",
           "legendFormat": "{{event_name}}"
         }
       ]
@@ -27,7 +83,7 @@
     {
       "type": "timeseries",
       "title": "Report exports",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
       "targets": [
         {
           "expr": "sum by (outcome) (rate(payroll_business_events_total{event_name=\"report.export.completed\"}[5m]))",
@@ -37,19 +93,19 @@
     },
     {
       "type": "timeseries",
-      "title": "Security denials",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "title": "Security events",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
       "targets": [
         {
-          "expr": "sum by (event_name) (rate(payroll_security_events_total{outcome=\"denied\"}[5m]))",
-          "legendFormat": "{{event_name}}"
+          "expr": "sum by (event_name, outcome) (rate(payroll_security_events_total[5m]))",
+          "legendFormat": "{{event_name}} ({{outcome}})"
         }
       ]
     },
     {
       "type": "timeseries",
       "title": "AI provider calls",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
       "targets": [
         {
           "expr": "sum by (status_class) (rate(payroll_http_client_requests_total{provider=\"openrouter\"}[5m]))",
@@ -60,8 +116,17 @@
   ],
   "schemaVersion": 39,
   "tags": ["payroll", "business"],
-  "time": { "from": "now-6h", "to": "now" },
+  "time": { "from": "now-1h", "to": "now" },
   "title": "Payroll Business & Security",
   "uid": "payroll-business-security",
-  "version": 1
+  "version": 2,
+  "links": [
+    {
+      "title": "Application Logs (Elasticsearch)",
+      "type": "link",
+      "url": "/d/payroll-application-logs/application-logs",
+      "icon": "gf-logs",
+      "targetBlank": false
+    }
+  ]
 }

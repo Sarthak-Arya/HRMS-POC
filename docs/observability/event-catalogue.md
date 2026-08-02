@@ -61,8 +61,11 @@ Schema version: `1`. Event names are lowercase dotted verbs.
 | `payroll.employee.status_changed` | business | success |
 | `payroll.job.failed` | business | failure |
 | `compensation.component.changed` | audit | success |
+| `compensation.structure.changed` | audit | success |
+| `compensation.assignment.changed` | audit | success |
+| `compensation.override.changed` | audit | success |
 | `compensation.import.started` | business | success |
-| `compensation.import.completed` | business | success |
+| `compensation.import.completed` | business | success/failure |
 | `compensation.import.failed` | business | failure |
 | `compensation.statutory.failed` | business | failure |
 | `compensation.adjustment.applied` | business | success |
@@ -77,14 +80,30 @@ Schema version: `1`. Event names are lowercase dotted verbs.
 | `attendance.daily.saved` | business | success |
 | `attendance.monthly.saved` | business | success |
 | `attendance.month.locked` | business | success |
+| `attendance.month.lock_failed` | business | failure |
 | `attendance.compoff.changed` | business | success |
-| `attendance.leave_exception.changed` | business | success |
+| `attendance.leave_exception.changed` | audit | success |
+| `attendance.leave_type.changed` | audit | success |
 | `report.template.changed` | audit | success |
 | `report.preview.requested` | business | success |
 | `report.export.started` | business | success |
 | `report.export.completed` | business | success/failure |
+| `employee.created` | business | success |
+| `employee.updated` | business | success |
+| `employee.save.failed` | business | failure |
+| `employee.import.started` | business | success |
+| `employee.import.completed` | business | success/failure |
+| `employee.template.downloaded` | audit | success/failure |
+| `employee.status_changed` | business | success |
+| `company.created` | audit | success |
+| `company.updated` | audit | success |
+| `company.save.failed` | business | failure |
+| `company.import.completed` | business | success/failure |
 | `settings.section.changed` | audit | success |
+| `settings.section.save_failed` | business | failure |
 | `settings.organization.changed` | audit | success |
+| `company.setup.step_completed` | business | success |
+
 | `ai.request.completed` | integration | success/failure |
 | `ai.tool.mutating_invoked` | audit | success/failure |
 
