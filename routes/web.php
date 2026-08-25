@@ -30,6 +30,7 @@ use App\Http\Livewire\ReportHub;
 use App\Http\Livewire\SettingsHub;
 use App\Http\Livewire\AiAssistantPage;
 use App\Http\Controllers\PayslipController;
+use App\Http\Controllers\LandingController;
 
 use App\Http\Middleware\CompanyAccessMiddleware;
 use App\Services\Auth\AuthLandingService;
@@ -52,9 +53,7 @@ use Illuminate\Http\Request;
 */
 
 
-Route::get('/', function () {
-    return redirect('/login');
-});
+Route::get('/', LandingController::class)->name('landing');
 
 Route::get('/healthz', [\App\Http\Controllers\Health\HealthController::class, 'liveness'])->name('health.liveness');
 Route::get('/readyz', [\App\Http\Controllers\Health\HealthController::class, 'readiness'])->name('health.readiness');

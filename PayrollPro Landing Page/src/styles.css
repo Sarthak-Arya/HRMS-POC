@@ -1,0 +1,160 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * PayrollPro — Enterprise Admin design system.
+ * Light mode only. All colors are oklch tokens mapped to Tailwind utilities.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  --font-display: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-strong: var(--accent-strong);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
+  --shadow-soft: 0 10px 24px oklch(0.2247 0.0391 265.98 / 0.08);
+  --shadow-primary: 0 10px 25px oklch(0.4807 0.1759 257.73 / 0.18);
+}
+
+:root {
+  --radius: 1rem;
+
+  --background: oklch(0.9826 0.0095 299.24);
+  --foreground: oklch(0.2247 0.0391 265.98);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2247 0.0391 265.98);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2247 0.0391 265.98);
+
+  --primary: oklch(0.4807 0.1759 257.73);
+  --primary-hover: oklch(0.4006 0.1476 257.9);
+  --primary-foreground: oklch(1 0 0);
+
+  --secondary: oklch(0.9491 0.0244 278.37);
+  --secondary-foreground: oklch(0.2247 0.0391 265.98);
+
+  --muted: oklch(0.9669 0.016 282.28);
+  --muted-foreground: oklch(0.3984 0.0229 268.72);
+  --faint: oklch(0.5698 0.0223 270.02);
+
+  --surface-2: oklch(0.9491 0.0244 278.37);
+  --surface-3: oklch(0.9314 0.0329 276.38);
+
+  --accent: oklch(0.9142 0.0411 270.46);
+  --accent-foreground: oklch(0.2247 0.0391 265.98);
+  --accent-strong: oklch(0.9314 0.0329 276.38);
+
+  --success: oklch(0.596 0.1274 163.23);
+  --success-foreground: oklch(1 0 0);
+  --destructive: oklch(0.506 0.1927 27.7);
+  --destructive-foreground: oklch(1 0 0);
+  --warning: oklch(0.918 0.0489 54.09);
+  --warning-foreground: oklch(0.4839 0.1223 53.37);
+
+  --border: oklch(0.8283 0.0227 274.68);
+  --input: oklch(0.8283 0.0227 274.68);
+  --ring: oklch(0.4807 0.1759 257.73);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px oklch(0.4807 0.1759 257.73 / 0.15);
+  }
+
+  .material-symbols-outlined {
+    font-variation-settings:
+      "FILL" 0,
+      "wght" 400,
+      "GRAD" 0,
+      "opsz" 24;
+    line-height: 1;
+    user-select: none;
+  }
+}
+
+@utility mono-label {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 500;
+}
+
+@utility tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@utility ui-card {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow-soft);
+  padding: 1.5rem;
+}
+
+@utility section-shell {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1200px;
+  padding-inline: 1.25rem;
+}
