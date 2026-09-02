@@ -12,7 +12,7 @@
                 <span class="material-symbols-outlined">payments</span>
             </span>
             <span class="ui-sidebar-brand-text">
-                <span class="ui-sidebar-brand-title">PayrollPro</span>
+                <span class="ui-sidebar-brand-title">FlipCore</span>
                 <span class="ui-sidebar-brand-subtitle">Enterprise Admin</span>
             </span>
         </a>

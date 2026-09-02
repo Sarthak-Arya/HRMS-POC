@@ -36,7 +36,7 @@
         <div class="ui-setup-card">
             <div class="ui-setup-card-header">
                 <div>
-                    <h2 class="ui-setup-card-title">Get started with PayrollPro</h2>
+                    <h2 class="ui-setup-card-title">Get started with FlipCore</h2>
                     <p class="ui-setup-card-subtitle mb-0">
                         Follow the checklist below. You can return anytime from the sidebar.
                     </p>

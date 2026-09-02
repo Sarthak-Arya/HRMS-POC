@@ -12,7 +12,7 @@ import {
   StatusBadge,
 } from "@/components/landing/primitives";
 
-const title = "PayrollPro: Enterprise Payroll & HRMS for Indian Companies";
+const title = "FlipCore: Enterprise Payroll & HRMS for Indian Companies";
 const description =
   "Run payroll with confidence: attendance lock, salary structures, PF/ESI, loan EMIs and adjustments in one locked monthly run with payslips and salary sheets.";
 
@@ -299,7 +299,7 @@ function Landing() {
                 </span>
                 <h3 className="mt-5 text-[18px] leading-snug text-foreground">{p.pain}</h3>
                 <div className="mt-4 border-t border-border pt-4">
-                  <p className="mono-label text-[9px] text-primary">How PayrollPro handles it</p>
+                  <p className="mono-label text-[9px] text-primary">How FlipCore handles it</p>
                   <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">{p.solve}</p>
                 </div>
               </div>
@@ -420,7 +420,7 @@ function Landing() {
           <SectionHeading
             eyebrow="Security &amp; trust"
             title="Controls a finance reviewer can check, not just read about."
-            body="PayrollPro is built for auditability first: scoped data, explicit permissions, and history that cannot be rewritten after lock."
+            body="FlipCore is built for auditability first: scoped data, explicit permissions, and history that cannot be rewritten after lock."
           />
           <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {security.map((s) => (
@@ -487,7 +487,7 @@ function Landing() {
             <div>
               <Eyebrow>Fit check</Eyebrow>
               <h2 className="mt-3 text-3xl leading-tight text-foreground sm:text-[2.3rem]">
-                Where PayrollPro stops.
+                Where FlipCore stops.
               </h2>
               <p className="mt-4 max-w-md text-[14px] leading-relaxed text-muted-foreground">
                 Better you hear it now than three months into a rollout.
@@ -568,7 +568,7 @@ function Landing() {
             </ul>
           </div>
           <p className="border-t border-border pt-6 text-[12px] leading-relaxed text-faint">
-            PayrollPro · Enterprise Admin · proof-of-concept demo product. Screens and figures shown here are
+            FlipCore · Enterprise Admin · proof-of-concept demo product. Screens and figures shown here are
             sample data. No certifications or client claims are implied.
           </p>
         </div>

@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $title ?? 'PayrollPro: Enterprise Payroll & HRMS for Indian Companies' }}</title>
+    <title>{{ $title ?? 'FlipCore: Enterprise Payroll & HRMS for Indian Companies' }}</title>
     <meta name="description" content="{{ $description ?? 'Run payroll with confidence: attendance lock, salary structures, PF/ESI, loan EMIs and adjustments in one locked monthly run with payslips and salary sheets.' }}">
-    <meta property="og:title" content="{{ $title ?? 'PayrollPro: Enterprise Payroll & HRMS for Indian Companies' }}">
+    <meta property="og:title" content="{{ $title ?? 'FlipCore: Enterprise Payroll & HRMS for Indian Companies' }}">
     <meta property="og:description" content="{{ $description ?? 'Run payroll with confidence: attendance lock, salary structures, PF/ESI, loan EMIs and adjustments in one locked monthly run with payslips and salary sheets.' }}">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">

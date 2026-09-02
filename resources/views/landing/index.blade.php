@@ -173,7 +173,7 @@
                             </span>
                             <h3 class="mt-5 text-[18px] leading-snug text-foreground">{{ $problem['pain'] }}</h3>
                             <div class="mt-4 border-t border-border pt-4">
-                                <p class="mono-label text-[9px] text-primary">How PayrollPro handles it</p>
+                                <p class="mono-label text-[9px] text-primary">How FlipCore handles it</p>
                                 <p class="mt-2 text-[13px] leading-relaxed text-muted-foreground">{{ $problem['solve'] }}</p>
                             </div>
                         </div>
@@ -278,7 +278,7 @@
                 <x-landing.section-heading
                     eyebrow="Security &amp; trust"
                     title="Controls a finance reviewer can check, not just read about."
-                    body="PayrollPro is built for auditability first: scoped data, explicit permissions, and history that cannot be rewritten after lock."
+                    body="FlipCore is built for auditability first: scoped data, explicit permissions, and history that cannot be rewritten after lock."
                 />
                 <div class="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     @foreach ($security as $item)
@@ -331,7 +331,7 @@
                 <div class="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                     <div>
                         <x-landing.eyebrow>Fit check</x-landing.eyebrow>
-                        <h2 class="mt-3 text-3xl leading-tight text-foreground sm:text-[2.3rem]">Where PayrollPro stops.</h2>
+                        <h2 class="mt-3 text-3xl leading-tight text-foreground sm:text-[2.3rem]">Where FlipCore stops.</h2>
                         <p class="mt-4 max-w-md text-[14px] leading-relaxed text-muted-foreground">
                             Better you hear it now than three months into a rollout.
                         </p>
@@ -380,7 +380,7 @@
                     </ul>
                 </div>
                 <p class="border-t border-border pt-6 text-[12px] leading-relaxed text-faint">
-                    PayrollPro · Enterprise Admin · proof-of-concept demo product. Screens and figures shown here are
+                    FlipCore · Enterprise Admin · proof-of-concept demo product. Screens and figures shown here are
                     sample data. No certifications or client claims are implied.
                 </p>
             </div>

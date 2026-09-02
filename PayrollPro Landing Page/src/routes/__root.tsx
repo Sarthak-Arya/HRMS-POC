@@ -77,13 +77,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "PayrollPro: Enterprise Payroll & HRMS" },
+      { title: "FlipCore: Enterprise Payroll & HRMS" },
       {
         name: "description",
         content:
           "Enterprise payroll and HRMS for Indian companies: attendance lock, salary structures, PF/ESI, adjustments and locked monthly payroll runs.",
       },
-      { property: "og:title", content: "PayrollPro: Enterprise Payroll & HRMS" },
+      { property: "og:title", content: "FlipCore: Enterprise Payroll & HRMS" },
       {
         property: "og:description",
         content: "Close payroll for 150 employees in 3 working days: attendance lock, salary structures, PF and ESI, then a locked run.",

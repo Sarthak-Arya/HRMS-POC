@@ -144,7 +144,7 @@ class CompanySetupWizardTest extends TestCase
         $this->actingAs($owner)
             ->get(route('getting-started', ['company_id' => $company->id]))
             ->assertOk()
-            ->assertSee('Get started with PayrollPro')
+            ->assertSee('Get started with FlipCore')
             ->assertSee('Add Organisation Details')
             ->assertSee('Add Employees');
     }

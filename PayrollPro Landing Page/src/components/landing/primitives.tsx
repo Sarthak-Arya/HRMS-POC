@@ -139,7 +139,7 @@ export function Logo() {
       </span>
       <span className="leading-tight">
         <span className="block font-[family-name:var(--font-display)] text-[17px] font-bold text-foreground">
-          PayrollPro
+          FlipCore
         </span>
         <span className="mono-label block text-[9px] text-faint">Enterprise Admin</span>
       </span>

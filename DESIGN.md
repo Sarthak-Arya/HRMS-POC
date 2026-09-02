@@ -1,8 +1,8 @@
-# PayrollPro App Dashboard Design System
+# FlipCore App Dashboard Design System
 
 **Source of truth:** `public/assets/css/app-dashboard.css`  
 **Codename:** Stitch Unified Light Mode  
-**Product:** Enterprise payroll & HRMS admin (PayrollPro)  
+**Product:** Enterprise payroll & HRMS admin (FlipCore)  
 **Primary mode:** Light (dark mode supported via `data-theme="dark"`)
 
 ---

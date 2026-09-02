@@ -51,7 +51,7 @@
               <div class="col-8 mx-auto text-center mt-1">
                   <p class="mb-0 text-secondary">
                       Copyright © {{ now()->year }} <a style="color: #252f40;" href="https://www.creative-tim.com"
-                          class="font-weight-bold ml-1" target="_blank">Aryans Associates</a>
+                          class="font-weight-bold ml-1" target="_blank">FlipCore</a>
               </div>
               </p>
           </div>

@@ -25,7 +25,7 @@ class LandingPageTest extends TestCase
         $response = $this->get(route('landing'));
 
         $response->assertOk();
-        $response->assertSee('PayrollPro', false);
+        $response->assertSee('FlipCore', false);
         $response->assertSee('Close payroll for 150 employees', false);
         $response->assertSee('href="'.route('login').'"', false);
         $response->assertSee('href="'.route('sign-up').'"', false);
