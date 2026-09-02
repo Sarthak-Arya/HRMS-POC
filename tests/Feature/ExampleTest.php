@@ -12,5 +12,6 @@ class ExampleTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('FlipCore', false);
+        $response->assertDontSee('Soft UI Dashboard', false);
     }
 }

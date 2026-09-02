@@ -9,7 +9,9 @@
     <meta property="og:description" content="{{ $description ?? 'Run payroll with confidence: attendance lock, salary structures, PF/ESI, loan EMIs and adjustments in one locked monthly run with payslips and salary sheets.' }}">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
-    <link rel="icon" type="image/png" href="{{ asset('assets/img/favicon.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('assets/img/apple-icon.png') }}?v=2">
+    <link rel="icon" type="image/svg+xml" href="{{ asset('assets/img/favicon.svg') }}?v=2">
+    <link rel="icon" type="image/png" href="{{ asset('assets/img/favicon.png') }}?v=2">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">

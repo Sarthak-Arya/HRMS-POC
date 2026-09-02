@@ -4,8 +4,8 @@
           <i class="fas fa-times p-3 cursor-pointer text-secondary opacity-5 position-absolute left-0 top-0 d-none d-xl-none"
               aria-hidden="true" id="iconSidenav"></i>
           <a class="navbar-brand m-0" href="{{ route('dashboard') }}">
-              <img src="../assets/img/logo-ct.png" class="navbar-brand-img h-100" alt="...">
-              <span class="me-1 font-weight-bold">Soft UI Dashboard</span>
+              <img src="{{ asset('assets/img/favicon.png') }}" class="navbar-brand-img h-100" alt="FlipCore">
+              <span class="me-1 font-weight-bold">FlipCore</span>
           </a>
       </div>
       <hr class="horizontal dark mt-0">
@@ -466,7 +466,7 @@
                               <div class="col-lg-6 mb-lg-0 mb-4">
                                   <div class="d-flex flex-column h-100">
                                       <p class="mb-1 pt-2 text-bold">بناها المطورون</p>
-                                      <h5 class="font-weight-bolder">Soft UI Dashboard</h5>
+                                      <h5 class="font-weight-bolder">FlipCore</h5>
                                       <p class="mb-5">من الألوان والبطاقات والطباعة إلى العناصر المعقدة ، ستجد الوثائق
                                           الكاملة.</p>
                                       <a class="text-dark font-weight-bold ps-1 mb-0 icon-move-left mt-auto"

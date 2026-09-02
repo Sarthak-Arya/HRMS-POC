@@ -26,6 +26,7 @@ class LandingPageTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('FlipCore', false);
+        $response->assertDontSee('Soft UI Dashboard', false);
         $response->assertSee('Close payroll for 150 employees', false);
         $response->assertSee('href="'.route('login').'"', false);
         $response->assertSee('href="'.route('sign-up').'"', false);

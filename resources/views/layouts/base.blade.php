@@ -19,11 +19,10 @@
     @if (env('IS_DEMO'))
         <x-demo-metas></x-demo-metas>
     @endif
-    <link rel="apple-touch-icon" sizes="76x76" href="../assets/img/apple-icon.png">
-    <link rel="icon" type="image/png" href="../assets/img/favicon.png">
-    <title>
-        FlipCore
-    </title>
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('assets/img/apple-icon.png') }}?v=2">
+    <link rel="icon" type="image/svg+xml" href="{{ asset('assets/img/favicon.svg') }}?v=2">
+    <link rel="icon" type="image/png" href="{{ asset('assets/img/favicon.png') }}?v=2">
+    <title>FlipCore</title>
 
     <!-- Fonts and icons     -->
     <script src="https://kit.fontawesome.com/bcb22c69aa.js" crossorigin="anonymous"></script>
