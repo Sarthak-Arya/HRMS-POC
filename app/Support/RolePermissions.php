@@ -10,6 +10,21 @@ class RolePermissions
     /**
      * @return list<Permission>
      */
+    public static function selfServiceBundle(): array
+    {
+        return [
+            Permission::EssAccess,
+            Permission::EssProfile,
+            Permission::EssLeave,
+            Permission::EssAttendance,
+            Permission::EssPayslips,
+            Permission::EssDirectory,
+        ];
+    }
+
+    /**
+     * @return list<Permission>
+     */
     public static function forRole(UserRole $role): array
     {
         return match ($role) {
@@ -42,6 +57,8 @@ class RolePermissions
                 Permission::SettingsManageReports,
                 Permission::SettingsManageTax,
                 Permission::SettingsManageStatutory,
+                Permission::EssApprovalsAny,
+                Permission::EssPortalInvite,
             ],
 
             UserRole::B2bStaff => [
@@ -62,9 +79,10 @@ class RolePermissions
                 Permission::AiAssistantUse,
                 Permission::SettingsView,
                 Permission::SettingsManageCompensation,
+                Permission::EssApprovalsAny,
+                Permission::EssPortalInvite,
             ],
 
-            // B2C company owner — single company; can create their own company once.
             UserRole::CompanyAdmin => [
                 Permission::CompaniesView,
                 Permission::CompaniesCreate,
@@ -90,6 +108,8 @@ class RolePermissions
                 Permission::SettingsManageReports,
                 Permission::SettingsManageTax,
                 Permission::SettingsManageStatutory,
+                Permission::EssApprovalsAny,
+                Permission::EssPortalInvite,
             ],
 
             UserRole::PayrollManager => [
@@ -111,6 +131,7 @@ class RolePermissions
                 Permission::SettingsManageCompensation,
                 Permission::SettingsManageTax,
                 Permission::SettingsManageStatutory,
+                Permission::EssPortalInvite,
             ],
 
             UserRole::HrManager => [
@@ -129,6 +150,9 @@ class RolePermissions
                 Permission::SettingsView,
                 Permission::SettingsManageOrganization,
                 Permission::SettingsManageAttendance,
+                Permission::EssApprovals,
+                Permission::EssApprovalsAny,
+                Permission::EssPortalInvite,
             ],
 
             UserRole::Accountant => [
@@ -154,6 +178,13 @@ class RolePermissions
                 Permission::CompensationView,
                 Permission::ReportsView,
             ],
+
+            UserRole::Manager => [
+                ...self::selfServiceBundle(),
+                Permission::EssApprovals,
+            ],
+
+            UserRole::Employee => self::selfServiceBundle(),
         };
     }
 

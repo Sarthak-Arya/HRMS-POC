@@ -10,8 +10,12 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @property int $id
  * @property int $company_id
+ * @property int|null $user_id
+ * @property int|null $manager_id
  * @property string $employee_code
  * @property string $employee_name
+ * @property string|null $work_email
+ * @property string|null $phone
  * @property string|null $gender
  * @property string|null $father_name
  * @property int|null $location_id
@@ -30,6 +34,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $permanent_state
  * @property string|null $permanent_pincode
  * @property string|null $permanent_country
+ * @property string|null $emergency_contact_name
+ * @property string|null $emergency_contact_phone
  * @property string|null $pf_no
  * @property string|null $esi_no
  * @property int|null $department_id
@@ -44,6 +50,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read string $full_name
  * @property-read \App\Models\Company $company
+ * @property-read \App\Models\User|null $user
+ * @property-read \App\Models\Employee|null $manager
  * @property-read \App\Models\Department|null $department
  * @property-read \App\Models\Designation|null $designation
  * @property-read \App\Models\Location|null $location
@@ -67,8 +75,12 @@ class Employee extends Model
 
     protected $fillable = [
         'company_id',
+        'user_id',
+        'manager_id',
         'employee_code',
         'employee_name',
+        'work_email',
+        'phone',
         'gender',
         'father_name',
         'location_id',
@@ -87,6 +99,8 @@ class Employee extends Model
         'permanent_state',
         'permanent_pincode',
         'permanent_country',
+        'emergency_contact_name',
+        'emergency_contact_phone',
         'pf_no',
         'esi_no',
         'department_id',
@@ -107,6 +121,41 @@ class Employee extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function manager()
+    {
+        return $this->belongsTo(self::class, 'manager_id');
+    }
+
+    public function directReports()
+    {
+        return $this->hasMany(self::class, 'manager_id');
+    }
+
+    public function leaveBalances()
+    {
+        return $this->hasMany(EmployeeLeaveBalance::class);
+    }
+
+    public function leaveRequests()
+    {
+        return $this->hasMany(LeaveRequest::class);
+    }
+
+    public function attendanceLogs()
+    {
+        return $this->hasMany(EmployeeAttendanceLog::class);
+    }
+
+    public function hasPortalAccess(): bool
+    {
+        return $this->user_id !== null;
     }
 
     /**

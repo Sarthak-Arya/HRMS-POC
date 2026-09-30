@@ -155,6 +155,39 @@ Route::middleware('auth')->group(function () {
             Route::middleware('permission:ai.assistant.use')->group(function () {
                 Route::get('/ai-assistant', AiAssistantPage::class)->name('ai-assistant');
             });
+
+            // Employee Self-Service portal
+            Route::prefix('me')->name('ess.')->group(function () {
+                Route::middleware('permission:ess.approvals,ess.approvals.any')->group(function () {
+                    Route::get('/approvals', \App\Http\Livewire\Ess\LeaveApprovals::class)->name('approvals');
+                });
+
+                Route::middleware(['permission:ess.access', 'ess.employee'])->group(function () {
+                    Route::get('/', \App\Http\Livewire\Ess\EssHome::class)->name('home');
+
+                    Route::middleware('permission:ess.profile')->group(function () {
+                        Route::get('/profile', \App\Http\Livewire\Ess\MyProfile::class)->name('profile');
+                    });
+
+                    Route::middleware('permission:ess.leave')->group(function () {
+                        Route::get('/leave', \App\Http\Livewire\Ess\MyLeave::class)->name('leave');
+                    });
+
+                    Route::middleware('permission:ess.attendance')->group(function () {
+                        Route::get('/attendance', \App\Http\Livewire\Ess\MyAttendance::class)->name('attendance');
+                    });
+
+                    Route::middleware('permission:ess.payslips')->group(function () {
+                        Route::get('/payslips', \App\Http\Livewire\Ess\MyPayslips::class)->name('payslips');
+                        Route::get('/payslips/{run_id}/{employee_payroll_id}', [\App\Http\Controllers\Ess\EssPayslipController::class, 'download'])
+                            ->name('payslip.download');
+                    });
+
+                    Route::middleware('permission:ess.directory')->group(function () {
+                        Route::get('/directory', \App\Http\Livewire\Ess\EssDirectory::class)->name('directory');
+                    });
+                });
+            });
         });
     });
 });

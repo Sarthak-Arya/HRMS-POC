@@ -39,12 +39,22 @@ class User extends Authenticatable
         return $this->belongsTo(Company::class, 'company_id');
     }
 
+    public function employee(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Employee::class);
+    }
+
     /**
      * Companies this B2B user can manage through their firm.
      */
     public function firmCompanies(): HasMany
     {
         return $this->hasMany(Company::class, 'b2b_firm_id', 'b2b_firm_id');
+    }
+
+    public function isSelfServiceUser(): bool
+    {
+        return $this->hasRole(UserRole::Employee) || $this->hasRole(UserRole::Manager);
     }
 
     public function isB2bUser(): bool

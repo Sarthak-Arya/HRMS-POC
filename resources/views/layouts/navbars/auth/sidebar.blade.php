@@ -81,6 +81,21 @@
                 ])
             @endcan
 
+            @can('ess.access')
+                @php
+                    $linkedEmployee = auth()->user()?->employee;
+                @endphp
+                @if($linkedEmployee && (int) $linkedEmployee->company_id === (int) $companyId)
+                    <p class="ui-sidebar-section-label">Self-Service</p>
+                    @include('layouts.navbars.auth.partials.ui-sidebar-link', [
+                        'href' => route('ess.home', ['company_id' => $companyId]),
+                        'active' => false,
+                        'icon' => 'badge',
+                        'label' => 'Employee Portal',
+                    ])
+                @endif
+            @endcan
+
             @can('salary.generate')
                 <p class="ui-sidebar-section-label">Salary Operations</p>
             @endcan

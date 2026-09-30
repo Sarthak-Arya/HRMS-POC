@@ -75,6 +75,16 @@ class UserFactory extends Factory
         return $this->withRole(UserRole::Viewer);
     }
 
+    public function employee(): static
+    {
+        return $this->withRole(UserRole::Employee);
+    }
+
+    public function manager(): static
+    {
+        return $this->withRole(UserRole::Manager);
+    }
+
     public function b2bAdmin(): static
     {
         return $this->withRole(UserRole::B2bAdmin);

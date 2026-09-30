@@ -62,6 +62,17 @@ class AuthLandingService
      */
     public function homeRoute(User $user): string
     {
+        $linkedEmployee = app(\App\Services\Ess\EmployeeContext::class)->linkedEmployee($user);
+        $isEssOnly = $user->hasPermission(Permission::EssAccess)
+            && ! $user->hasPermission(Permission::DashboardView);
+
+        if ($isEssOnly && $linkedEmployee) {
+            session()->put('companyId', (string) $linkedEmployee->company_id);
+            session()->put('company_id', (string) $linkedEmployee->company_id);
+
+            return route('ess.home', ['company_id' => $linkedEmployee->company_id]);
+        }
+
         $companies = $this->accessibleCompanies($user);
         $canManageMultiple = $this->canManageMultipleCompanies($user);
 
@@ -72,6 +83,12 @@ class AuthLandingService
 
             if ($canManageMultiple) {
                 return route('view-companies');
+            }
+
+            if ($linkedEmployee) {
+                session()->put('companyId', (string) $linkedEmployee->company_id);
+
+                return route('ess.home', ['company_id' => $linkedEmployee->company_id]);
             }
 
             return route('profile');
@@ -103,6 +120,13 @@ class AuthLandingService
     {
         session()->put('companyId', (string) $company->id);
 
+        $isEssOnly = $user->hasPermission(Permission::EssAccess)
+            && ! $user->hasPermission(Permission::DashboardView);
+
+        if ($isEssOnly) {
+            return route('ess.home', ['company_id' => $company->id]);
+        }
+
         if (
             $user->hasPermission(Permission::SettingsView)
             && ! $this->setupProgress->isSetupComplete($company)
@@ -112,6 +136,10 @@ class AuthLandingService
 
         if ($user->hasPermission(Permission::DashboardView)) {
             return route('dashboard', ['company_id' => $company->id]);
+        }
+
+        if ($user->hasPermission(Permission::EssAccess)) {
+            return route('ess.home', ['company_id' => $company->id]);
         }
 
         return route('getting-started', ['company_id' => $company->id]);

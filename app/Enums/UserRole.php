@@ -12,6 +12,8 @@ enum UserRole: string
     case HrManager = 'hr_manager';
     case Accountant = 'accountant';
     case Viewer = 'viewer';
+    case Manager = 'manager';
+    case Employee = 'employee';
 
     public function label(): string
     {
@@ -24,6 +26,8 @@ enum UserRole: string
             self::HrManager => 'HR Manager',
             self::Accountant => 'Accountant',
             self::Viewer => 'Viewer',
+            self::Manager => 'People Manager',
+            self::Employee => 'Employee',
         };
     }
 
@@ -38,6 +42,8 @@ enum UserRole: string
             self::HrManager => 'Manages employees and attendance; read-only compensation.',
             self::Accountant => 'Manages compensation structures and salary generation.',
             self::Viewer => 'Read-only access to company dashboards and records.',
+            self::Manager => 'Employee self-service plus approvals for direct reports.',
+            self::Employee => 'Employee self-service — profile, leave, attendance, and payslips.',
         };
     }
 
@@ -54,7 +60,14 @@ enum UserRole: string
             self::HrManager,
             self::Accountant,
             self::Viewer,
+            self::Manager,
+            self::Employee,
         ], true);
+    }
+
+    public function isSelfService(): bool
+    {
+        return in_array($this, [self::Employee, self::Manager], true);
     }
 
     /**
@@ -96,6 +109,8 @@ enum UserRole: string
             self::HrManager,
             self::Accountant,
             self::Viewer,
+            self::Manager,
+            self::Employee,
         ];
     }
 }

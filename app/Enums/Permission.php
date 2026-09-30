@@ -39,6 +39,16 @@ enum Permission: string
     case SettingsManageTax = 'settings.manage.tax';
     case SettingsManageStatutory = 'settings.manage.statutory';
 
+    case EssAccess = 'ess.access';
+    case EssProfile = 'ess.profile';
+    case EssLeave = 'ess.leave';
+    case EssAttendance = 'ess.attendance';
+    case EssPayslips = 'ess.payslips';
+    case EssDirectory = 'ess.directory';
+    case EssApprovals = 'ess.approvals';
+    case EssApprovalsAny = 'ess.approvals.any';
+    case EssPortalInvite = 'ess.portal.invite';
+
     public function label(): string
     {
         return match ($this) {
@@ -68,6 +78,15 @@ enum Permission: string
             self::SettingsManageReports => 'Manage report settings',
             self::SettingsManageTax => 'Manage tax settings',
             self::SettingsManageStatutory => 'Manage statutory component settings',
+            self::EssAccess => 'Access employee portal',
+            self::EssProfile => 'Manage own employee profile',
+            self::EssLeave => 'Apply and manage own leave',
+            self::EssAttendance => 'View own attendance and punch',
+            self::EssPayslips => 'View own payslips',
+            self::EssDirectory => 'View company directory',
+            self::EssApprovals => 'Approve team leave requests',
+            self::EssApprovalsAny => 'Approve any leave request in company',
+            self::EssPortalInvite => 'Invite employees to the portal',
         };
     }
 
@@ -90,6 +109,15 @@ enum Permission: string
             self::SettingsManageReports,
             self::SettingsManageTax,
             self::SettingsManageStatutory => 'Settings',
+            self::EssAccess,
+            self::EssProfile,
+            self::EssLeave,
+            self::EssAttendance,
+            self::EssPayslips,
+            self::EssDirectory,
+            self::EssApprovals,
+            self::EssApprovalsAny,
+            self::EssPortalInvite => 'Employee Self-Service',
         };
     }
 }

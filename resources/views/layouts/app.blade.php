@@ -11,6 +11,17 @@
             @include('layouts.navbars.guest.login')
             {{ $slot }}
             @include('layouts.footers.guest.description')
+        @elseif (str_starts_with((string) request()->route()->getName(), 'ess.'))
+            @include('layouts.navbars.auth.ess-sidebar')
+            @include('layouts.navbars.auth.nav')
+            {{ $slot }}
+            <main>
+                <div class="container-fluid">
+                    <div class="row">
+                        @include('layouts.footers.auth.footer')
+                    </div>
+                </div>
+            </main>
         @elseif (in_array(request()->route()->getName(), ['profile', 'my-profile']))
             @include('layouts.navbars.auth.sidebar')
             <div class="main-content position-relative bg-gray-100">
